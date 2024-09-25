@@ -206,7 +206,7 @@
 
             fetch(url, {
                 method: 'POST',
-                mode: 'cors', // Ensure CORS mode is enabled
+                mode: 'no-cors', // Ensure CORS mode is enabled
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             })
