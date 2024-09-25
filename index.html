@@ -187,7 +187,7 @@
 
         // Send batch data to Google Sheets
         function sendBatchDataToGoogleSheets(dataArray) {
-            const url = 'https://script.google.com/macros/s/AKfycby2lOiKT6tqNe7ro6teuN4aiWhEeJ58EBLMygPQBIBS4-RzcKDeaYltaDqOVsT6h4X9/exec';
+            const url = 'https://script.google.com/macros/s/AKfycbzoQtBaZrzgwzDWSAGRq-qv0kXrVk520x0B5qLs8kpeB-nCMxS_Hvo3tVPsR_4DmNh7/exec';
             const payload = {
                 data: dataArray.map((item, index) => ({
                     uniqueID: item.uniqueID,
