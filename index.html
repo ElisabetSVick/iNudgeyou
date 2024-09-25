@@ -166,6 +166,22 @@
 
                     // Log the payload for debugging
                     console.log(`Response index: ${responseIndex}, Correct index: ${data.correct_response_index}, Correct: ${data.correct}, Response Time: ${data.responseTime}, Age: ${data.age}`);
+
+                    // Prepare data to send
+                    const trialData = {
+                        uniqueID: uniqueID,
+                        age: data.age,
+                        trialNumber: i + 1,  // Trial number (1-indexed)
+                        word_displayed: trial.word,
+                        correct_color: trial.correct_color,
+                        response: isCorrect ? "Correct" : "Incorrect", // You can change this based on your needs
+                        correct: data.correct,  // Boolean value for correct
+                        responseTime: data.responseTime,
+                        isNudge: data.isNudge  // Use the correct property from trial data
+                    };
+
+                    // Send trial data to Google Sheets
+                    sendTrialDataToGoogleSheets(trialData);
                 }
             };
 
@@ -185,28 +201,17 @@
 
         timeline.push(finalMessage);
 
-        // Send batch data to Google Sheets
-        function sendBatchDataToGoogleSheets(dataArray) {
+        // Send individual trial data to Google Sheets
+        function sendTrialDataToGoogleSheets(trialData) {
             const url = 'https://script.google.com/macros/s/AKfycbzoQtBaZrzgwzDWSAGRq-qv0kXrVk520x0B5qLs8kpeB-nCMxS_Hvo3tVPsR_4DmNh7/exec'; 
             const payload = {
-                data: dataArray.map((item, index) => ({
-                    uniqueID: item.uniqueID,
-                    age: item.age,
-                    trialNumber: index + 1,
-                    word: item.word_displayed,
-                    displayedColor: item.correct_color,
-                    response: item.response,
-                    correct: item.correct,
-                    responseTime: item.responseTime,
-                    isNudgeTrial: item.isNudge // Use the correct property from trial data
-                }))
+                data: trialData // Send trial data directly
             };
 
             console.log("Payload being sent:", JSON.stringify(payload)); // Log the payload for debugging
 
             fetch(url, {
                 method: 'POST',
-                mode: 'no-cors', // Ensure CORS mode is enabled
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             })
@@ -217,17 +222,16 @@
                 return response.json(); // Parse JSON response
             })
             .then(data => {
-                console.log('Batch data sent successfully:', data); // Log success response
+                console.log('Trial data sent successfully:', data); // Log success response
             })
             .catch(error => {
-                console.error('Error sending batch data:', error); // Log fetch error
+                console.error('Error sending trial data:', error); // Log fetch error
             });
         }
 
         // Start the experiment
         jsPsych.run(timeline).then(() => {
-            const trialData = jsPsych.data.get().values();  // Get all trial data
-            sendBatchDataToGoogleSheets(trialData);  // Send all trial data to Google Sheets
+            console.log('Experiment completed successfully!'); // Log experiment completion
         });
     </script>
 </body>
