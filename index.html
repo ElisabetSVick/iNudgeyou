@@ -34,8 +34,29 @@
         // Initialize JsPsych
         const jsPsych = initJsPsych({ override_safe_mode: true });
 
+        // Mutation Observer to change "Continue" to "Forsæt"
+        const observer = new MutationObserver((mutationsList) => {
+            for (const mutation of mutationsList) {
+                if (mutation.type === 'childList') {
+                    mutation.addedNodes.forEach(node => {
+                        if (node.nodeType === Node.ELEMENT_NODE) {
+                            const buttons = node.querySelectorAll('button');
+                            buttons.forEach(button => {
+                                if (button.textContent.trim() === 'Continue') {
+                                    button.textContent = 'Forsæt';
+                                }
+                            });
+                        }
+                    });
+                }
+            }
+        });
+
+        const targetNode = document.getElementById('jspsych-target');
+        observer.observe(targetNode, { childList: true, subtree: true });
+
         // Unique ID for each participant
-        const timestamp = new Date().toISOString().split('T')[0];  // Get date only (YYYY-MM-DD)
+        const timestamp = new Date().toISOString();
         const uniqueID = timestamp.replace(/[:.-]/g, "");
 
         // Age question
@@ -46,7 +67,7 @@
                 data.uniqueID = uniqueID;
                 data.timestamp = timestamp;
                 data.age = data.response; // Capture the age
-                jsPsych.data.addDataToLastTrial({ age: data.age }); // Add age to last trial
+                jsPsych.data.addDataToLastTrial({ age: data.age }); // Explicitly add age to the last trial
             }
         };
 
@@ -66,11 +87,13 @@
         }
 
         const timeline = [ageQuestion];
-        const nudgeTrialIndices = [];  // Track nudge trial indices
-        const totalTrials = 20; // Total trials excluding nudge trials
+
+        // Create an array of indices to randomly choose nudge trials
+        const trialIndices = Array.from({ length: 20 }, (_, i) => i);
+        const nudgeTrialIndices = jsPsych.randomization.sampleWithoutReplacement(trialIndices, Math.floor(20 / 3));  // Select 1/3 of trials as nudge trials (6-7 trials)
 
         // Create Stroop trials
-        for (let i = 0; i < totalTrials; i++) {
+        for (let i = 0; i < 20; i++) {
             const trial = stroop_trials[Math.floor(Math.random() * stroop_trials.length)];
 
             const isCongruentTrial = Math.random() < 0.5;
@@ -96,15 +119,25 @@
                 ? [correctButtonText, incorrectButtonText]
                 : [incorrectButtonText, correctButtonText];
 
+            // Map button text to Danish
+            const buttonChoices = choices.map(color => {
+                switch (color) {
+                    case "red": return "rød";
+                    case "green": return "grøn";
+                    case "blue": return "blå";
+                    case "yellow": return "gul";
+                    default: return color;
+                }
+            });
+
             // If this trial is a nudge trial, first show the circle with the correct color
-            if (Math.random() < 0.3) {  // Randomly decide to make this a nudge trial (30% chance)
+            if (nudgeTrialIndices.includes(i)) {
                 // Nudge trial
-                nudgeTrialIndices.push(i); // Track nudge trial index
                 timeline.push({
                     type: jsPsychHtmlButtonResponse,
                     stimulus: `<div class='nudge-circle' style='background-color: ${trial.correct_color};'></div>`,
                     choices: [],  // No choices during the nudge display
-                    trial_duration: 400,  // Show nudge for 400 ms
+                    trial_duration: 300,  // Show nudge for 300 ms
                     data: { isNudge: true }
                 });
             }
@@ -113,43 +146,40 @@
             const stroop_task = {
                 type: jsPsychHtmlButtonResponse,
                 stimulus: `<p style='color: ${displayedColor}; font-size: 24px;'>${trial.word}</p>`,
-                choices: choices,
+                choices: buttonChoices,
                 data: {
                     correct_response_index: correctIndex,  // Store the correct response index
                     word_displayed: trial.word,
-                    correct_color: trial.correct_color
+                    correct_color: trial.correct_color,
+                    choices: buttonChoices,
+                    isCongruent: isCongruentTrial,  // Add congruency info here
+                    age: (function() {
+                        const lastTrialData = jsPsych.data.getLastTrialData().values()[0];
+                        return lastTrialData ? lastTrialData.age : null; // Capture age safely
+                    })()
                 },
                 on_finish: function(data) {
                     const responseIndex = data.response;  // Get the index of the pressed button
                     const isCorrect = responseIndex === data.correct_response_index;  // Compare the index
 
-                    data.correct = isCorrect ? 1 : 0;  // Store as 1 (correct) or 0 (incorrect)
+                    data.correct = isCorrect;  // Save if the response was correct
                     data.responseTime = data.rt; // Capture response time
 
-                    // Add age to the trial data
-                    const lastTrialData = jsPsych.data.getLastTrialData().values()[0];
-                    data.age = lastTrialData ? lastTrialData.age : null; // Capture age safely
-
                     // Log the payload for debugging
-                    console.log(`Trial data: ${JSON.stringify(data)}`); // Log each trial data
+                    console.log(`Response index: ${responseIndex}, Correct index: ${data.correct_response_index}, Congruent: ${data.isCongruent}, Correct: ${data.correct}, Response Time: ${data.responseTime}, Age: ${data.age}`);
                 }
             };
 
             timeline.push(stroop_task);
         }
 
-        // Final message displaying the number of correct responses and average response time
+        // Final message displaying the number of correct responses
         const finalMessage = {
             type: jsPsychHtmlButtonResponse,
             stimulus: function() {
-                const trialData = jsPsych.data.get().filter({ isNudge: false });  // Exclude nudge trials
-                const correctCount = trialData.filter({ correct: 1 }).count();  // Count correct responses
-                const totalRT = trialData.select('responseTime').values().reduce((a, b) => a + b, 0);
-                const avgRT = correctCount > 0 ? (totalRT / correctCount).toFixed(2) : 0;  // Calculate average response time
-
+                const correctCount = jsPsych.data.get().filter({correct: true}).count();  // Count correct responses
                 return `<p>Tak for din deltagelse!</p>
-                        <p>Du havde ${correctCount} korrekte svar ud af ${totalTrials} forsøg.</p>
-                        <p>Gennemsnitlig reaktionstid: ${avgRT} ms</p>`;
+                        <p>Du havde ${correctCount} korrekte svar ud af 20.</p>`;
             },
             choices: ['OK']
         };
@@ -158,46 +188,45 @@
 
         // Send batch data to Google Sheets
         function sendBatchDataToGoogleSheets(dataArray) {
-            const url = 'https://script.google.com/macros/s/AKfycbzoQtBaZrzgwzDWSAGRq-qv0kXrVk520x0B5qLs8kpeB-nCMxS_Hvo3tVPsR_4DmNh7/exec'; 
+            const url = 'https://script.google.com/macros/s/AKfycbzoQtBaZrzgwzDWSAGRq-qv0kXrVk520x0B5qLs8kpeB-nCMxS_Hvo3tVPsR_4DmNh7/exec';
             const payload = {
-                data: dataArray.map((item) => ({
-                    uniqueID: item.uniqueID,
-                    timestamp: timestamp,
-                    correct: item.correct,
-                    word: item.word_displayed,
-                    congruent: item.correct === 1 ? 1 : 0, // Set congruent based on correctness
-                    nudge: item.isNudge ? 1 : 0, // 1 for nudge trial, 0 otherwise
-                    rt: item.responseTime,
-                    age: item.age // Include age in each trial
+                data: dataArray.map((item, index) => ({
+                    uniqueID: item.uniqueID || '',  // Ensure no undefined values
+                    age: item.age || { Q0: '' },    // Provide default empty object for age
+                    trialNumber: index + 1,         // Trial number starts at 1
+                    word: item.word_displayed || '', // Word displayed or empty string
+                    displayedColor: item.correct_color || '', // Displayed color
+                    response: item.response || { Q0: '' },  // Ensure response is a valid object
+                    correct: item.correct || false,         // Default to false if not provided
+                    responseTime: item.responseTime || 0,   // Default to 0 if not provided
+                    isCongruent: item.isCongruent || false, // Add congruent info to payload
+                    isNudgeTrial: item.isNudge || false     // Default to false if not provided
                 }))
             };
 
-            console.log("Payload being sent:", JSON.stringify(payload)); // Log the payload for debugging
+            console.log("Payload being sent:", JSON.stringify(payload));  // Debugging
 
             fetch(url, {
                 method: 'POST',
-                mode: 'no-cors', // Ensure CORS mode is enabled
-                headers: { 'Content-Type': 'application/json' },
+                mode: 'cors',
+                cache: 'no-cache',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
                 body: JSON.stringify(payload)
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok ' + response.statusText); // Handle non-200 responses
-                }
-                return response.json(); // Parse JSON response
-            })
-            .then(data => {
-                console.log('Batch data sent successfully:', data); // Log success response
-            })
-            .catch(error => {
-                console.error('Error sending batch data:', error); // Log fetch error
+            }).then(response => {
+                console.log('Data successfully sent to Google Sheets:', response);
+            }).catch(error => {
+                console.error('Error sending data to Google Sheets:', error);
             });
         }
 
-        // Start the experiment
-        jsPsych.run(timeline).then(() => {
-            const trialData = jsPsych.data.get().filter({ isNudge: false }).values();  // Get all trial data excluding nudge trials
-            sendBatchDataToGoogleSheets(trialData);  // Send collected data to Google Sheets
+        jsPsych.run(timeline);
+
+        // After the experiment ends, gather all data and send it to Google Sheets
+        jsPsych.onFinish(() => {
+            const allData = jsPsych.data.get().values();
+            sendBatchDataToGoogleSheets(allData);
         });
     </script>
 </body>
