@@ -177,7 +177,7 @@
         const finalMessage = {
             type: jsPsychHtmlButtonResponse,
             stimulus: function() {
-                const correctCount = jsPsych.data.get().filter({correct: true}).count();  // Count correct responses
+                const correctCount = jsPsych.data.get().filter({ correct: true }).count();  // Count correct responses
                 return `<p>Tak for din deltagelse!</p>
                         <p>Du havde ${correctCount} korrekte svar ud af 20.</p>`;
             },
@@ -189,18 +189,20 @@
         // Send batch data to Google Sheets
         function sendBatchDataToGoogleSheets(dataArray) {
             const url = 'https://script.google.com/macros/s/AKfycbzoQtBaZrzgwzDWSAGRq-qv0kXrVk520x0B5qLs8kpeB-nCMxS_Hvo3tVPsR_4DmNh7/exec';
+            
+            // Transform and sanitize the payload
             const payload = {
                 data: dataArray.map((item, index) => ({
                     uniqueID: item.uniqueID || '',  // Ensure no undefined values
-                    age: item.age || { Q0: '' },    // Provide default empty object for age
+                    age: item.age ? item.age.Q0 : '',  // Capture age, or provide empty string if not present
                     trialNumber: index + 1,         // Trial number starts at 1
-                    word: item.word_displayed || '', // Word displayed or empty string
+                    word: item.word_displayed || '', // Word displayed
                     displayedColor: item.correct_color || '', // Displayed color
-                    response: item.response || { Q0: '' },  // Ensure response is a valid object
-                    correct: item.correct || false,         // Default to false if not provided
-                    responseTime: item.responseTime || 0,   // Default to 0 if not provided
-                    isCongruent: item.isCongruent || false, // Add congruent info to payload
-                    isNudgeTrial: item.isNudge || false     // Default to false if not provided
+                    response: item.response !== undefined ? item.response : '',  // Make sure response exists
+                    correct: item.correct !== undefined ? item.correct : false,  // Ensure correct is boolean
+                    responseTime: item.responseTime || 0,   // Default response time to 0
+                    isCongruent: item.isCongruent !== undefined ? item.isCongruent : false,  // Ensure boolean
+                    isNudgeTrial: item.isNudge !== undefined ? item.isNudge : false  // Default false
                 }))
             };
 
@@ -208,7 +210,7 @@
 
             fetch(url, {
                 method: 'POST',
-                mode: 'cors',
+                mode: 'cors',  // Use 'cors' instead of 'no-cors'
                 cache: 'no-cache',
                 headers: {
                     'Content-Type': 'application/json'
@@ -221,13 +223,13 @@
             });
         }
 
-        jsPsych.run(timeline);
-
-        // After the experiment ends, gather all data and send it to Google Sheets
         jsPsych.onFinish(() => {
             const allData = jsPsych.data.get().values();
             sendBatchDataToGoogleSheets(allData);
         });
+
+        // Start the experiment
+        jsPsych.run(timeline);
     </script>
 </body>
 </html>
