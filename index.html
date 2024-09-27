@@ -181,7 +181,12 @@
                 return `<p>Tak for din deltagelse!</p>
                         <p>Du havde ${correctCount} korrekte svar ud af 20.</p>`;
             },
-            choices: ['OK']
+            choices: ['OK'],
+            on_finish: function() {
+                // After the final message, send the data to Google Sheets
+                const allData = jsPsych.data.get().values();  // Get all experiment data
+                sendBatchDataToGoogleSheets(allData);  // Send data to Google Sheets
+            }
         };
 
         timeline.push(finalMessage);
@@ -223,14 +228,8 @@
             });
         }
 
-        jsPsych.onFinish(() => {
-            const allData = jsPsych.data.get().values();
-            sendBatchDataToGoogleSheets(allData);
-        });
-
         // Start the experiment
         jsPsych.run(timeline);
     </script>
 </body>
 </html>
-
