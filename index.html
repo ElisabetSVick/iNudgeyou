@@ -214,6 +214,7 @@
             console.log("Payload being sent:", JSON.stringify(payload));  // Debugging
 
             fetch(url, {
+                redirect: 'follow',
                 method: 'POST',
                 mode: 'cors',  // Use 'cors' instead of 'no-cors'
                 cache: 'no-cache',
