@@ -4,10 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Stroop Opgave Eksperiment</title>
+
+    <!-- jsPsych and jsPsych plugins -->
     <script src="https://unpkg.com/jspsych@8.0.0"></script>
     <script src="https://unpkg.com/@jspsych/plugin-html-button-response@2.0.0"></script>
     <script src="https://unpkg.com/@jspsych/plugin-survey-text@2.0.0"></script>
     <link href="https://unpkg.com/jspsych@8.0.0/css/jspsych.css" rel="stylesheet" type="text/css" />
+
+    <!-- jsPsychSheet library -->
+    <script src="https://brain2ai.github.io/jsPsychSheet/jspsychsheet.js"></script>
+    <link rel="stylesheet" href="https://brain2ai.github.io/jsPsychSheet/jspsychsheet.css">
+
     <style>
         body {
             background-color: black;
@@ -31,7 +38,7 @@
     <div id="jspsych-target"></div>
 
     <script>
-        // Initialize JsPsych
+        // Initialize jsPsych
         const jsPsych = initJsPsych({ override_safe_mode: true });
 
         // Mutation Observer to change "Continue" to "Forsæt"
@@ -183,55 +190,23 @@
             },
             choices: ['OK'],
             on_finish: function() {
-                // After the final message, send the data to Google Sheets
-                const allData = jsPsych.data.get().values();  // Get all experiment data
-                sendBatchDataToGoogleSheets(allData);  // Send data to Google Sheets
+                console.log('Experiment finished.');
             }
         };
 
         timeline.push(finalMessage);
 
-        // Send batch data to Google Sheets
-        function sendBatchDataToGoogleSheets(dataArray) {
-            const url = 'https://script.google.com/macros/s/AKfycbwLl08ZwClWobsVd3fE7uC6HY4LQsZk1tvOt3lGFIHpgbulCqbJan181caFYto2qV6k/exec';
-            
-            // Transform and sanitize the payload
-            const payload = {
-                data: dataArray.map((item, index) => ({
-                    uniqueID: item.uniqueID || '',  // Ensure no undefined values
-                    age: item.age ? item.age.Q0 : '',  // Capture age, or provide empty string if not present
-                    trialNumber: index + 1,         // Trial number starts at 1
-                    word: item.word_displayed || '', // Word displayed
-                    displayedColor: item.correct_color || '', // Displayed color
-                    response: item.response !== undefined ? item.response : '',  // Make sure response exists
-                    correct: item.correct !== undefined ? item.correct : false,  // Ensure correct is boolean
-                    responseTime: item.responseTime || 0,   // Default response time to 0
-                    isCongruent: item.isCongruent !== undefined ? item.isCongruent : false,  // Ensure boolean
-                    isNudgeTrial: item.isNudge !== undefined ? item.isNudge : false  // Default false
-                }))
-            };
+        // Start the experiment with jsPsychSheet upload
+        const my_url = 'https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec';  // Replace with your Google Apps Script URL
+        jsPsych.init({
+            timeline: timeline,
+            show_progress_bar: true,
+            on_finish: function () {
+                // Use jsPsychSheet to upload the data
+                jsPsychSheet.uploadData(my_url, jsPsych.data.get().csv());
+            }
+        });
 
-            console.log("Payload being sent:", JSON.stringify(payload));  // Debugging
-
-            fetch(url, {
-                redirect: 'follow',
-                method: 'POST',
-                mode: 'cors',
-                cache: 'no-cache',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(payload)
-            }).then(response => {
-                console.log('Data successfully sent to Google Sheets:', response);
-            }).catch(error => {
-                console.error('Error sending data to Google Sheets:', error);
-            });
-        }
-
-        // Start the experiment
-        jsPsych.run(timeline);
     </script>
 </body>
 </html>
-
