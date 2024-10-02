@@ -228,7 +228,7 @@
                     type: jsPsychHtmlButtonResponse,
                     stimulus: `<div class='nudge-circle' style='background-color: ${trial.correct_color};'></div>`,
                     choices: [],  // No choices during the nudge display
-                    trial_duration: 3000,  // Show the circle for 3 seconds
+                    trial_duration: 300,  // Show the circle for .3 seconds
                     on_finish: function() {
                         // Add the main trial after the nudge
                         timeline.push({
