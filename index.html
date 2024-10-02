@@ -1,127 +1,36 @@
 <!DOCTYPE html>
 <html lang="da">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Stroop Opgave Eksperiment</title>
-
-    <!-- Load jQuery -->
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
-
-    <!-- jsPsych core library -->
     <script src="https://unpkg.com/jspsych@8.0.0"></script>
-
-    <!-- Plugins for jsPsych -->
     <script src="https://unpkg.com/@jspsych/plugin-html-button-response@2.0.0"></script>
     <script src="https://unpkg.com/@jspsych/plugin-survey-text@2.0.0"></script>
-
-    <!-- CSS for jsPsych -->
     <link href="https://unpkg.com/jspsych@8.0.0/css/jspsych.css" rel="stylesheet" type="text/css" />
-
     <style>
         body {
             background-color: black;
             color: white;
         }
-
         .response-button {
             padding: 10px 20px;
             margin: 10px;
             font-size: 16px;
             cursor: pointer;
         }
-
         .nudge-circle {
-            width: 100px;
-            height: 100px;
+            width: 70px;
+            height: 70px;
             border-radius: 50%;
             margin: 20px auto;
         }
     </style>
 </head>
-
 <body>
     <div id="jspsych-target"></div>
 
     <script>
-        // jsPsychSheet v2 - A simple JavaScript library to use jsPsych and Google Sheet to run behavioral experiments online.
-        // Created by Shashi Kant Gupta, June 06, 2021.
-
-        function showUploadStatus() {
-            var jspsych_content = document.getElementById("jspsych-content");
-            jspsych_content.innerHTML = 'Uploading your data<br><br><div class="spinner-border" role="status"><span class="sr-only">Loading...</span></div>';
-        }
-
-        function onUploadSuccess() {
-            var jspsych_content = document.getElementById("jspsych-content");
-            jspsych_content.innerHTML = 'Your data is successfully uploaded!';
-        }
-
-        function ajaxCall(url, data_row, subID, last_i, inbetween) {
-            if (data_row.length - 2 <= last_i) {
-                console.log('Remote sheet updated!', data_row.length, last_i, inbetween);
-                if (inbetween == 0) {
-                    onUploadSuccess();
-                }
-            } else if ((subID == -1) && (last_i != 0)) {
-                jQuery.ajax({
-                    url: url,
-                    method: "GET",
-                    data: [{ name: "getSubID", value: 1 }],
-                }).done(function(__e) {
-                    ajaxCall(url, data_row, __e['subID'], last_i, inbetween);
-                }).fail(function(__e) {
-                    console.log('Remote sheet update failed', __e);
-                    return 0;
-                });
-            } else {
-                var data = [];
-                var flag = true;
-                data.push(data_row[0]);
-                while (flag) {
-                    if ((last_i < data_row.length - 2) && (data.join("\n").length + data_row[last_i + 1].length < 3500)) {
-                        data.push(data_row[last_i + 1]);
-                        last_i = last_i + 1;
-                    } else {
-                        jQuery.ajax({
-                            url: url,
-                            method: "GET",
-                            data: [{ name: "data", value: data.join("\n") }, { name: "subID", value: subID }],
-                        }).done(function(__e) {
-                            console.log(Math.floor((last_i / (data_row.length - 2)) * 100).toString() + '% data sent!', __e);
-                            ajaxCall(url, data_row, __e['subID'], last_i, inbetween);
-                        }).fail(function(__e) {
-                            console.log('Remote sheet update failed', __e);
-                            return 0;
-                        });
-
-                        flag = false;
-                    }
-                }
-            }
-        }
-
-        var jsPsychSheet = {
-            lastrow: 0,
-
-            uploadPartialData: function(url, data, inbetween = 1) {
-                var data_row = data.split(/\r?\n|\r/);
-                ajaxCall(url, data_row, -1, this.lastrow, inbetween);
-                this.lastrow = data_row.length - 2;
-            },
-
-            uploadData: function(url, data, inbetween = 0) {
-                if (inbetween == 0) {
-                    showUploadStatus();
-                }
-
-                var data_row = data.split(/\r?\n|\r/);
-                ajaxCall(url, data_row, -1, this.lastrow, inbetween);
-                this.lastrow = data_row.length - 2;
-            }
-        };
-
         // Initialize JsPsych
         const jsPsych = initJsPsych({ override_safe_mode: true });
 
@@ -148,14 +57,14 @@
 
         // Unique ID for each participant
         const timestamp = new Date().toISOString();
-        const uniqueID = timestamp.replace(/[:.-]/g, "");
+
 
         // Age question
         const ageQuestion = {
             type: jsPsychSurveyText,
             questions: [{ prompt: "Hvad er din alder?", required: true }],
             on_finish: function(data) {
-                data.uniqueID = uniqueID;
+
                 data.timestamp = timestamp;
                 data.age = data.response; // Capture the age
                 jsPsych.data.addDataToLastTrial({ age: data.age }); // Explicitly add age to the last trial
@@ -228,55 +137,94 @@
                     type: jsPsychHtmlButtonResponse,
                     stimulus: `<div class='nudge-circle' style='background-color: ${trial.correct_color};'></div>`,
                     choices: [],  // No choices during the nudge display
-                    trial_duration: 300,  // Show the circle for .3 seconds
-                    on_finish: function() {
-                        // Add the main trial after the nudge
-                        timeline.push({
-                            type: jsPsychHtmlButtonResponse,
-                            stimulus: `<div style='font-size: 48px; color: ${displayedColor};'>${trial.word}</div>`,
-                            choices: buttonChoices,
-                            data: { correct: correctIndex },
-                            on_finish: function(data) {
-                                data.correct = data.response == data.correct;
-                                data.uniqueID = uniqueID;
-                                data.congruent = isCongruentTrial ? 1 : 0;
-                            }
-                        });
-                    }
-                });
-            } else {
-                // Non-nudge trial
-                timeline.push({
-                    type: jsPsychHtmlButtonResponse,
-                    stimulus: `<div style='font-size: 48px; color: ${displayedColor};'>${trial.word}</div>`,
-                    choices: buttonChoices,
-                    data: { correct: correctIndex },
-                    on_finish: function(data) {
-                        data.correct = data.response == data.correct;
-                        data.uniqueID = uniqueID;
-                        data.congruent = isCongruentTrial ? 1 : 0;
-                    }
+                    trial_duration: 300,  // Show nudge for 300 ms
+                    data: { isNudge: true }
                 });
             }
+
+            // Add the main Stroop task trial
+            const stroop_task = {
+                type: jsPsychHtmlButtonResponse,
+                stimulus: `<p style='color: ${displayedColor}; font-size: 24px;'>${trial.word}</p>`,
+                choices: buttonChoices,
+                data: {
+                    correct_response_index: correctIndex,  // Store the correct response index
+                    word_displayed: trial.word,
+                    correct_color: trial.correct_color,
+                    choices: buttonChoices,
+                    isCongruent: isCongruentTrial,  // Add congruency info here
+                    age: (function() {
+                        const lastTrialData = jsPsych.data.getLastTrialData().values()[0];
+                        return lastTrialData ? lastTrialData.age : null; // Capture age safely
+                    })()
+                },
+                on_finish: function(data) {
+                    const responseIndex = data.response;  // Get the index of the pressed button
+                    const isCorrect = responseIndex === data.correct_response_index;  // Compare the index
+
+                    data.correct = isCorrect;  // Save if the response was correct
+                    data.responseTime = data.rt; // Capture response time
+
+                    // Log the payload for debugging
+                    console.log(`Response index: ${responseIndex}, Correct index: ${data.correct_response_index}, Congruent: ${data.isCongruent}, Correct: ${data.correct}, Response Time: ${data.responseTime}, Age: ${data.age}`);
+                }
+            };
+
+            timeline.push(stroop_task);
         }
 
-        // End of experiment
-        timeline.push({
+        // Final message displaying the number of correct responses
+        const finalMessage = {
             type: jsPsychHtmlButtonResponse,
-            stimulus: 'Tak fordi du deltog i eksperimentet!',
-            choices: ['Afslut'],
+            stimulus: function() {
+                const correctCount = jsPsych.data.get().filter({ correct: true }).count();  // Count correct responses
+                return `<p>Tak for din deltagelse!</p>
+                        <p>Du havde ${correctCount} korrekte svar ud af 20.</p>`;
+            },
+            choices: ['OK'],
             on_finish: function() {
-                const data = jsPsych.data.get().csv();
-
-
-                const sheetURL = "https://script.google.com/macros/s/AKfycbxauFri0MuKDhuOrbqwOl1ddaKItpZb7JNjwAv6nCy4u1sBEWiEHvxtFBVFJIjbTY7C/exec";
-                jsPsychSheet.uploadData(sheetURL, data, 0);
+                // After the final message, send the data to Google Sheets using jsPsychSheet
+                const allData = jsPsych.data.get().csv();  // Get all experiment data in CSV format
+                jsPsychSheet.uploadData('https://script.google.com/macros/s/AKfycbxauFri0MuKDhuOrbqwOl1ddaKItpZb7JNjwAv6nCy4u1sBEWiEHvxtFBVFJIjbTY7C/exec', allData);
             }
-        });
+        };
 
-        // Run experiment
+        timeline.push(finalMessage);
+
+        // Start the experiment
         jsPsych.run(timeline);
     </script>
-</body>
 
+    <script>
+
+
+        function showUploadStatus() {
+            var jspsych_content = document.getElementById("jspsych-content");
+            jspsych_content.innerHTML = 'Uploading your data<br><br><div class="spinner-border" role="status"><span class="sr-only">Loading...</span></div>';
+        }
+
+        function endUploadStatus() {
+            var jspsych_content = document.getElementById("jspsych-content");
+            jspsych_content.innerHTML = '<p>Data has been uploaded successfully!</p>';
+        }
+
+        var jsPsychSheet = {
+            uploadData: function(url, csvData) {
+                showUploadStatus();
+                var xhr = new XMLHttpRequest();
+                xhr.open("POST", url, true);
+                xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+
+                xhr.onreadystatechange = function() {
+                    if (xhr.readyState === 4 && xhr.status === 200) {
+                        endUploadStatus();
+                    }
+                };
+
+                xhr.send("data=" + encodeURIComponent(csvData));
+            }
+        };
+    </script>
+
+</body>
 </html>
