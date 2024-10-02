@@ -45,6 +45,83 @@
     <div id="jspsych-target"></div>
 
     <script>
+        // jsPsychSheet v2 - A simple JavaScript library to use jsPsych and Google Sheet to run behavioral experiments online.
+        // Created by Shashi Kant Gupta, June 06, 2021.
+
+        function showUploadStatus() {
+            var jspsych_content = document.getElementById("jspsych-content");
+            jspsych_content.innerHTML = 'Uploading your data<br><br><div class="spinner-border" role="status"><span class="sr-only">Loading...</span></div>';
+        }
+
+        function onUploadSuccess() {
+            var jspsych_content = document.getElementById("jspsych-content");
+            jspsych_content.innerHTML = 'Your data is successfully uploaded!';
+        }
+
+        function ajaxCall(url, data_row, subID, last_i, inbetween) {
+            if (data_row.length - 2 <= last_i) {
+                console.log('Remote sheet updated!', data_row.length, last_i, inbetween);
+                if (inbetween == 0) {
+                    onUploadSuccess();
+                }
+            } else if ((subID == -1) && (last_i != 0)) {
+                jQuery.ajax({
+                    url: url,
+                    method: "GET",
+                    data: [{ name: "getSubID", value: 1 }],
+                }).done(function(__e) {
+                    ajaxCall(url, data_row, __e['subID'], last_i, inbetween);
+                }).fail(function(__e) {
+                    console.log('Remote sheet update failed', __e);
+                    return 0;
+                });
+            } else {
+                var data = [];
+                var flag = true;
+                data.push(data_row[0]);
+                while (flag) {
+                    if ((last_i < data_row.length - 2) && (data.join("\n").length + data_row[last_i + 1].length < 3500)) {
+                        data.push(data_row[last_i + 1]);
+                        last_i = last_i + 1;
+                    } else {
+                        jQuery.ajax({
+                            url: url,
+                            method: "GET",
+                            data: [{ name: "data", value: data.join("\n") }, { name: "subID", value: subID }],
+                        }).done(function(__e) {
+                            console.log(Math.floor((last_i / (data_row.length - 2)) * 100).toString() + '% data sent!', __e);
+                            ajaxCall(url, data_row, __e['subID'], last_i, inbetween);
+                        }).fail(function(__e) {
+                            console.log('Remote sheet update failed', __e);
+                            return 0;
+                        });
+
+                        flag = false;
+                    }
+                }
+            }
+        }
+
+        var jsPsychSheet = {
+            lastrow: 0,
+
+            uploadPartialData: function(url, data, inbetween = 1) {
+                var data_row = data.split(/\r?\n|\r/);
+                ajaxCall(url, data_row, -1, this.lastrow, inbetween);
+                this.lastrow = data_row.length - 2;
+            },
+
+            uploadData: function(url, data, inbetween = 0) {
+                if (inbetween == 0) {
+                    showUploadStatus();
+                }
+
+                var data_row = data.split(/\r?\n|\r/);
+                ajaxCall(url, data_row, -1, this.lastrow, inbetween);
+                this.lastrow = data_row.length - 2;
+            }
+        };
+
         // Initialize JsPsych
         const jsPsych = initJsPsych({ override_safe_mode: true });
 
@@ -151,86 +228,54 @@
                     type: jsPsychHtmlButtonResponse,
                     stimulus: `<div class='nudge-circle' style='background-color: ${trial.correct_color};'></div>`,
                     choices: [],  // No choices during the nudge display
-                    trial_duration: 300,  // Show nudge for 300 ms
-                    data: { isNudge: true }
+                    trial_duration: 3000,  // Show the circle for 3 seconds
+                    on_finish: function() {
+                        // Add the main trial after the nudge
+                        timeline.push({
+                            type: jsPsychHtmlButtonResponse,
+                            stimulus: `<div style='font-size: 48px; color: ${displayedColor};'>${trial.word}</div>`,
+                            choices: buttonChoices,
+                            data: { correct: correctIndex },
+                            on_finish: function(data) {
+                                data.correct = data.response == data.correct;
+                                data.uniqueID = uniqueID;
+                                data.congruent = isCongruentTrial ? 1 : 0;
+                            }
+                        });
+                    }
+                });
+            } else {
+                // Non-nudge trial
+                timeline.push({
+                    type: jsPsychHtmlButtonResponse,
+                    stimulus: `<div style='font-size: 48px; color: ${displayedColor};'>${trial.word}</div>`,
+                    choices: buttonChoices,
+                    data: { correct: correctIndex },
+                    on_finish: function(data) {
+                        data.correct = data.response == data.correct;
+                        data.uniqueID = uniqueID;
+                        data.congruent = isCongruentTrial ? 1 : 0;
+                    }
                 });
             }
-
-            // Add the main Stroop task trial
-            const stroop_task = {
-                type: jsPsychHtmlButtonResponse,
-                stimulus: `<p style='color: ${displayedColor}; font-size: 24px;'>${trial.word}</p>`,
-                choices: buttonChoices,
-                data: {
-                    correct_response_index: correctIndex,  // Store the correct response index
-                    word_displayed: trial.word,
-                    correct_color: trial.correct_color,
-                    choices: buttonChoices,
-                    isCongruent: isCongruentTrial,  // Add congruency info here
-                    age: (function() {
-                        const lastTrialData = jsPsych.data.getLastTrialData().values()[0];
-                        return lastTrialData ? lastTrialData.age : null; // Capture age safely
-                    })()
-                },
-                on_finish: function(data) {
-                    const responseIndex = data.response;  // Get the index of the pressed button
-                    const isCorrect = responseIndex === data.correct_response_index;  // Compare the index
-
-                    data.correct = isCorrect;  // Save if the response was correct
-                    data.responseTime = data.rt; // Capture response time
-
-                    // Log the payload for debugging
-                    console.log(`Response index: ${responseIndex}, Correct index: ${data.correct_response_index}, Congruent: ${data.isCongruent}, Correct: ${data.correct}, Response Time: ${data.responseTime}, Age: ${data.age}`);
-                }
-            };
-
-            timeline.push(stroop_task);
         }
 
-        // Final message displaying the number of correct responses
-        const finalMessage = {
+        // End of experiment
+        timeline.push({
             type: jsPsychHtmlButtonResponse,
-            stimulus: function() {
-                const correctCount = jsPsych.data.get().filter({ correct: true }).count();  // Count correct responses
-                return `<p>Tak for din deltagelse!</p>
-                        <p>Du havde ${correctCount} korrekte svar ud af 20.</p>`;
-            },
-            choices: ['OK']
-        };
+            stimulus: 'Tak fordi du deltog i eksperimentet!',
+            choices: ['Afslut'],
+            on_finish: function() {
+                const data = jsPsych.data.get().csv();
 
-        timeline.push(finalMessage);
 
-        // Function to upload data after the experiment ends
-        function uploadData() {
-            const url = "https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec"; // Update with your script ID
-            const data = jsPsych.data.get().csv(); // Collect data in CSV format
-
-            fetch(url, {
-                method: 'POST',
-                body: data,
-                headers: {
-                    "Content-Type": "text/csv",
-                }
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok ' + response.statusText);
-                }
-                return response.text();
-            })
-            .then(data => console.log("Data uploaded successfully: ", data))
-            .catch(error => {
-                console.error("Data upload failed:", error);
-                alert("Data upload failed. Please check the console for more details.");
-            });
-        }
-
-        // Initialize the experiment
-        jsPsych.run({
-            timeline: timeline,
-            show_progress_bar: true,
-            on_finish: uploadData // Call uploadData function when the experiment is finished
+                const sheetURL = "https://script.google.com/macros/s/AKfycbxauFri0MuKDhuOrbqwOl1ddaKItpZb7JNjwAv6nCy4u1sBEWiEHvxtFBVFJIjbTY7C/exec";
+                jsPsychSheet.uploadData(sheetURL, data, 0);
+            }
         });
+
+        // Run experiment
+        jsPsych.run(timeline);
     </script>
 </body>
 
