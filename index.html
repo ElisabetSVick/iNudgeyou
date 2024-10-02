@@ -206,12 +206,16 @@
             timeline: timeline,
             show_progress_bar: true,
             on_finish: function () {
-                const url = "https://script.google.com/macros/s/AKfycbxauFri0MuKDhuOrbqwOl1ddaKItpZb7JNjwAv6nCy4u1sBEWiEHvxtFBVFJIjbTY7C/exec";
-                jsPsychSheet.uploadData(url, jsPsych.data.get().csv());
+                const url = "https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec";
+                try {
+                    jsPsychSheet.uploadData(url, jsPsych.data.get().csv());
+                } catch (error) {
+                    console.error("Data upload failed:", error);
+                    alert("Data upload failed. Please check the console for more details.");
+                }
             }
         });
     </script>
 </body>
 
 </html>
-
