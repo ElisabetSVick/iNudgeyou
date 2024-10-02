@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="da">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stroop Opgave Eksperiment</title>
+    <title>stroop task experiment</title>
     <script src="https://unpkg.com/jspsych@8.0.0"></script>
     <script src="https://unpkg.com/@jspsych/plugin-html-button-response@2.0.0"></script>
     <script src="https://unpkg.com/@jspsych/plugin-survey-text@2.0.0"></script>
@@ -62,7 +62,7 @@
         // Age question
         const ageQuestion = {
             type: jsPsychSurveyText,
-            questions: [{ prompt: "Hvad er din alder?", required: true }],
+            questions: [{ prompt: "How old are you?", required: true }],
             on_finish: function(data) {
 
                 data.timestamp = timestamp;
@@ -73,10 +73,10 @@
 
         // Stroop task definitions
         const stroop_trials = [
-            { word: "rød", correct_color: "red" },
-            { word: "grøn", correct_color: "green" },
-            { word: "blå", correct_color: "blue" },
-            { word: "gul", correct_color: "yellow" }
+            { word: "red", correct_color: "red" },
+            { word: "green", correct_color: "green" },
+            { word: "blue", correct_color: "blue" },
+            { word: "yellow", correct_color: "yellow" }
         ];
 
         // Get a random incorrect color, ensuring it's different from the correct one
@@ -122,10 +122,10 @@
             // Map button text to Danish
             const buttonChoices = choices.map(color => {
                 switch (color) {
-                    case "red": return "rød";
-                    case "green": return "grøn";
-                    case "blue": return "blå";
-                    case "yellow": return "gul";
+                    case "red": return "red";
+                    case "green": return "green";
+                    case "blue": return "blue";
+                    case "yellow": return "yellow";
                     default: return color;
                 }
             });
@@ -178,8 +178,8 @@
             type: jsPsychHtmlButtonResponse,
             stimulus: function() {
                 const correctCount = jsPsych.data.get().filter({ correct: true }).count();  // Count correct responses
-                return `<p>Tak for din deltagelse!</p>
-                        <p>Du havde ${correctCount} korrekte svar ud af 20.</p>`;
+                return `<p>Thank you for your participation!</p>
+                        <p>You had ${correctCount} correct answers out of 20.</p>`;
             },
             choices: ['OK'],
             on_finish: function() {
