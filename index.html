@@ -1,32 +1,45 @@
 <!DOCTYPE html>
 <html lang="da">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stroop Opgave Eksperiment</title>
-    <script src="https://unpkg.com/jspsych@8.0.0"></script>
-    <script src="https://unpkg.com/@jspsych/plugin-html-button-response@2.0.0"></script>
-    <script src="https://unpkg.com/@jspsych/plugin-survey-text@2.0.0"></script>
-    <link href="https://unpkg.com/jspsych@8.0.0/css/jspsych.css" rel="stylesheet" type="text/css" />
-    <style>
-        body {
+
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Stroop Opgave Eksperiment</title>
+      
+        <!-- jsPsych core library -->
+        <script src="https://unpkg.com/jspsych@8.0.0"></script>
+      
+        <!-- Plugins for jsPsych -->
+        <script src="https://unpkg.com/@jspsych/plugin-html-button-response@2.0.0"></script>
+        <script src="https://unpkg.com/@jspsych/plugin-survey-text@2.0.0"></script>
+      
+        <!-- CSS for jsPsych -->
+        <link href="https://unpkg.com/jspsych@8.0.0/css/jspsych.css" rel="stylesheet" type="text/css" />
+      
+        <!-- jsPsychSheet library -->
+        <script src="https://brain2ai.github.io/jsPsychSheet/jspsychsheet.js"></script>
+        <link rel="stylesheet" href="https://brain2ai.github.io/jsPsychSheet/jspsychsheet.css">
+      
+        <style>
+          body {
             background-color: black;
             color: white;
-        }
-        .response-button {
+          }
+          .response-button {
             padding: 10px 20px;
             margin: 10px;
             font-size: 16px;
             cursor: pointer;
-        }
-        .nudge-circle {
+          }
+          .nudge-circle {
             width: 100px;
             height: 100px;
             border-radius: 50%;
             margin: 20px auto;
-        }
-    </style>
-</head>
+          }
+        </style>
+      </head>
+
 <body>
     <div id="jspsych-target"></div>
 
@@ -181,56 +194,20 @@
                 return `<p>Tak for din deltagelse!</p>
                         <p>Du havde ${correctCount} korrekte svar ud af 20.</p>`;
             },
-            choices: ['OK'],
-            on_finish: function() {
-                // After the final message, send the data to Google Sheets
-                const allData = jsPsych.data.get().values();  // Get all experiment data
-                sendBatchDataToGoogleSheets(allData);  // Send data to Google Sheets
-            }
+            choices: ['OK']
         };
 
         timeline.push(finalMessage);
 
-        // Send batch data to Google Sheets
-        function sendBatchDataToGoogleSheets(dataArray) {
-            const url = 'https://script.google.com/macros/s/AKfycbwLl08ZwClWobsVd3fE7uC6HY4LQsZk1tvOt3lGFIHpgbulCqbJan181caFYto2qV6k/exec';
-            
-            // Transform and sanitize the payload
-            const payload = {
-                data: dataArray.map((item, index) => ({
-                    uniqueID: item.uniqueID || '',  // Ensure no undefined values
-                    age: item.age ? item.age.Q0 : '',  // Capture age, or provide empty string if not present
-                    trialNumber: index + 1,         // Trial number starts at 1
-                    word: item.word_displayed || '', // Word displayed
-                    displayedColor: item.correct_color || '', // Displayed color
-                    response: item.response !== undefined ? item.response : '',  // Make sure response exists
-                    correct: item.correct !== undefined ? item.correct : false,  // Ensure correct is boolean
-                    responseTime: item.responseTime || 0,   // Default response time to 0
-                    isCongruent: item.isCongruent !== undefined ? item.isCongruent : false,  // Ensure boolean
-                    isNudgeTrial: item.isNudge !== undefined ? item.isNudge : false  // Default false
-                }))
-            };
-
-            console.log("Payload being sent:", JSON.stringify(payload));  // Debugging
-
-            fetch(url, {
-                redirect: 'follow',
-                method: 'POST',
-                mode: 'cors',
-                cache: 'no-cache',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(payload)
-            }).then(response => {
-                console.log('Data successfully sent to Google Sheets:', response);
-            }).catch(error => {
-                console.error('Error sending data to Google Sheets:', error);
-            });
-        }
-
-        // Start the experiment
-        jsPsych.run(timeline);
+        // Initialize jsPsychSheet and run the experiment
+        jsPsych.run({
+            timeline: timeline,
+            show_progress_bar: true,
+            on_finish: function () {
+                const url = "https://script.google.com/macros/s/AKfycbxauFri0MuKDhuOrbqwOl1ddaKItpZb7JNjwAv6nCy4u1sBEWiEHvxtFBVFJIjbTY7C/exec";
+                jsPsychSheet.uploadData(url, jsPsych.data.get().csv());
+            }
+        });
     </script>
 </body>
 </html>
