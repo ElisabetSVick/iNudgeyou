@@ -200,35 +200,39 @@
 
         timeline.push(finalMessage);
 
-        // Run the experiment
+        // Function to upload data after the experiment ends
+        function uploadData() {
+            const url = "https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec"; // Update with your script ID
+            const data = jsPsych.data.get().csv(); // Collect data in CSV format
+
+            fetch(url, {
+                method: 'POST',
+                body: data,
+                headers: {
+                    "Content-Type": "text/csv",
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok ' + response.statusText);
+                }
+                return response.text();
+            })
+            .then(data => console.log("Data uploaded successfully: ", data))
+            .catch(error => {
+                console.error("Data upload failed:", error);
+                alert("Data upload failed. Please check the console for more details.");
+            });
+        }
+
+        // Initialize the experiment
         jsPsych.run({
             timeline: timeline,
             show_progress_bar: true,
-            on_finish: function () {
-                const url = "https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec"; // Update with your script ID
-                const data = jsPsych.data.get().csv(); // Collect data in CSV format
-                // Upload data using fetch (replace with your actual data upload logic)
-                fetch(url, {
-                    method: 'POST',
-                    body: data,
-                    headers: {
-                        "Content-Type": "text/csv",
-                    }
-                })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Network response was not ok ' + response.statusText);
-                    }
-                    return response.text();
-                })
-                .then(data => console.log("Data uploaded successfully: ", data))
-                .catch(error => {
-                    console.error("Data upload failed:", error);
-                    alert("Data upload failed. Please check the console for more details.");
-                });
-            }
+            on_finish: uploadData // Call uploadData function when the experiment is finished
         });
     </script>
 </body>
 
 </html>
+
