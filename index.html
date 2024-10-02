@@ -4,14 +4,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simple Reaction Time Task</title>
+    <title>Stroop Opgave Eksperiment</title>
+
+    <!-- Load jQuery -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
 
     <!-- jsPsych core library -->
     <script src="https://unpkg.com/jspsych@8.0.0"></script>
 
-    <!-- jsPsych plugins -->
+    <!-- Plugins for jsPsych -->
     <script src="https://unpkg.com/@jspsych/plugin-html-button-response@2.0.0"></script>
-    <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@2.0.0"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-survey-text@2.0.0"></script>
 
     <!-- CSS for jsPsych -->
     <link href="https://unpkg.com/jspsych@8.0.0/css/jspsych.css" rel="stylesheet" type="text/css" />
@@ -20,19 +23,20 @@
         body {
             background-color: black;
             color: white;
-            font-family: Arial, sans-serif;
         }
 
-        .stimulus {
-            font-size: 48px;
-            text-align: center;
-            margin: 20px;
+        .response-button {
+            padding: 10px 20px;
+            margin: 10px;
+            font-size: 16px;
+            cursor: pointer;
         }
 
-        .response {
-            font-size: 24px;
-            text-align: center;
-            margin: 20px;
+        .nudge-circle {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            margin: 20px auto;
         }
     </style>
 </head>
@@ -41,84 +45,193 @@
     <div id="jspsych-target"></div>
 
     <script>
-        // Initialize jsPsych
-        const jsPsych = initJsPsych({
-            on_finish: function() {
-                // When the experiment finishes, we can output the data or send it to a server
-                const data = jsPsych.data.get().csv(); // Get data in CSV format
-                console.log(data); // Log data in the console (can replace this with an upload)
+        // Initialize JsPsych
+        const jsPsych = initJsPsych({ override_safe_mode: true });
+
+        // Mutation Observer to change "Continue" to "Forsæt"
+        const observer = new MutationObserver((mutationsList) => {
+            for (const mutation of mutationsList) {
+                if (mutation.type === 'childList') {
+                    mutation.addedNodes.forEach(node => {
+                        if (node.nodeType === Node.ELEMENT_NODE) {
+                            const buttons = node.querySelectorAll('button');
+                            buttons.forEach(button => {
+                                if (button.textContent.trim() === 'Continue') {
+                                    button.textContent = 'Forsæt';
+                                }
+                            });
+                        }
+                    });
+                }
             }
         });
 
-        // Define timeline
-        const timeline = [];
+        const targetNode = document.getElementById('jspsych-target');
+        observer.observe(targetNode, { childList: true, subtree: true });
 
-        // Welcome message
-        const welcome = {
-            type: jsPsychHtmlButtonResponse,
-            stimulus: '<h1>Velkommen til eksperimentet!</h1><p>Tryk på "Start" for at begynde.</p>',
-            choices: ['Start']
-        };
-        timeline.push(welcome);
+        // Unique ID for each participant
+        const timestamp = new Date().toISOString();
+        const uniqueID = timestamp.replace(/[:.-]/g, "");
 
-        // Instructions
-        const instructions = {
-            type: jsPsychHtmlButtonResponse,
-            stimulus: '<h2>Opgavebeskrivelse</h2><p>Når du ser et billede, så tryk så hurtigt som muligt på "F" for rød og "J" for blå.</p>',
-            choices: ['Fortsæt']
-        };
-        timeline.push(instructions);
-
-        // Trial definition
-        const colors = ['red', 'blue'];
-        const keyMap = {
-            'red': 'F',
-            'blue': 'J'
+        // Age question
+        const ageQuestion = {
+            type: jsPsychSurveyText,
+            questions: [{ prompt: "Hvad er din alder?", required: true }],
+            on_finish: function(data) {
+                data.uniqueID = uniqueID;
+                data.timestamp = timestamp;
+                data.age = data.response; // Capture the age
+                jsPsych.data.addDataToLastTrial({ age: data.age }); // Explicitly add age to the last trial
+            }
         };
 
-        // Create trials
-        for (let i = 0; i < 10; i++) {
-            const color = jsPsych.randomization.sampleWithoutReplacement(colors, 1)[0]; // Randomly select color
-            const correctKey = keyMap[color];
+        // Stroop task definitions
+        const stroop_trials = [
+            { word: "rød", correct_color: "red" },
+            { word: "grøn", correct_color: "green" },
+            { word: "blå", correct_color: "blue" },
+            { word: "gul", correct_color: "yellow" }
+        ];
 
-            const trial = {
-                type: jsPsychHtmlKeyboardResponse,
-                stimulus: `<div class="stimulus" style="color: ${color};">${color.toUpperCase()}</div>`,
-                choices: ['F', 'J'],
-                data: { correct_key: correctKey, color: color },
-                on_finish: function(data) {
-                    const response = data.response;
-                    data.correct = response === data.correct_key; // Check if response is correct
-                },
-                trial_duration: 2000 // Display the stimulus for 2000 ms
-            };
-            timeline.push(trial);
+        // Get a random incorrect color, ensuring it's different from the correct one
+        function getRandomIncorrectColor(correctColor) {
+            const colors = ["red", "green", "blue", "yellow"];
+            const incorrectColors = colors.filter(color => color !== correctColor);
+            return incorrectColors[Math.floor(Math.random() * incorrectColors.length)];
         }
 
-        // Feedback after each trial
-        const feedback = {
-            type: jsPsychHtmlKeyboardResponse,
-            stimulus: function() {
-                const lastTrialData = jsPsych.data.getLastTrialData();
-                return lastTrialData.correct ? '<div class="response">Korrekt!</div>' : '<div class="response">Forkert!</div>';
-            },
-            choices: jsPsych.NO_KEYS,
-            trial_duration: 1000 // Show feedback for 1 second
-        };
-        timeline.push(feedback);
+        const timeline = [ageQuestion];
 
-        // End message
-        const endMessage = {
+        // Create an array of indices to randomly choose nudge trials
+        const trialIndices = Array.from({ length: 20 }, (_, i) => i);
+        const nudgeTrialIndices = jsPsych.randomization.sampleWithoutReplacement(trialIndices, Math.floor(20 / 3));  // Select 1/3 of trials as nudge trials (6-7 trials)
+
+        // Create Stroop trials
+        for (let i = 0; i < 20; i++) {
+            const trial = stroop_trials[Math.floor(Math.random() * stroop_trials.length)];
+
+            const isCongruentTrial = Math.random() < 0.5;
+            let displayedColor;
+            let correctButtonText = trial.word;
+            let incorrectButtonText;
+
+            // Determine displayed color and button text
+            if (isCongruentTrial) {
+                displayedColor = trial.correct_color;
+                incorrectButtonText = getRandomIncorrectColor(trial.correct_color);
+            } else {
+                displayedColor = getRandomIncorrectColor(trial.correct_color);
+                do {
+                    incorrectButtonText = getRandomIncorrectColor(trial.correct_color);
+                } while (incorrectButtonText === correctButtonText);
+            }
+
+            const correctButtonLeft = Math.random() < 0.5;  // Randomize button position
+            const correctIndex = correctButtonLeft ? 0 : 1;  // Store the index of the correct button
+
+            const choices = correctButtonLeft
+                ? [correctButtonText, incorrectButtonText]
+                : [incorrectButtonText, correctButtonText];
+
+            // Map button text to Danish
+            const buttonChoices = choices.map(color => {
+                switch (color) {
+                    case "red": return "rød";
+                    case "green": return "grøn";
+                    case "blue": return "blå";
+                    case "yellow": return "gul";
+                    default: return color;
+                }
+            });
+
+            // If this trial is a nudge trial, first show the circle with the correct color
+            if (nudgeTrialIndices.includes(i)) {
+                // Nudge trial
+                timeline.push({
+                    type: jsPsychHtmlButtonResponse,
+                    stimulus: `<div class='nudge-circle' style='background-color: ${trial.correct_color};'></div>`,
+                    choices: [],  // No choices during the nudge display
+                    trial_duration: 300,  // Show nudge for 300 ms
+                    data: { isNudge: true }
+                });
+            }
+
+            // Add the main Stroop task trial
+            const stroop_task = {
+                type: jsPsychHtmlButtonResponse,
+                stimulus: `<p style='color: ${displayedColor}; font-size: 24px;'>${trial.word}</p>`,
+                choices: buttonChoices,
+                data: {
+                    correct_response_index: correctIndex,  // Store the correct response index
+                    word_displayed: trial.word,
+                    correct_color: trial.correct_color,
+                    choices: buttonChoices,
+                    isCongruent: isCongruentTrial,  // Add congruency info here
+                    age: (function() {
+                        const lastTrialData = jsPsych.data.getLastTrialData().values()[0];
+                        return lastTrialData ? lastTrialData.age : null; // Capture age safely
+                    })()
+                },
+                on_finish: function(data) {
+                    const responseIndex = data.response;  // Get the index of the pressed button
+                    const isCorrect = responseIndex === data.correct_response_index;  // Compare the index
+
+                    data.correct = isCorrect;  // Save if the response was correct
+                    data.responseTime = data.rt; // Capture response time
+
+                    // Log the payload for debugging
+                    console.log(`Response index: ${responseIndex}, Correct index: ${data.correct_response_index}, Congruent: ${data.isCongruent}, Correct: ${data.correct}, Response Time: ${data.responseTime}, Age: ${data.age}`);
+                }
+            };
+
+            timeline.push(stroop_task);
+        }
+
+        // Final message displaying the number of correct responses
+        const finalMessage = {
             type: jsPsychHtmlButtonResponse,
-            stimulus: '<h1>Tak for din deltagelse!</h1><p>Du kan lukke denne fane.</p>',
-            choices: ['Afslut']
+            stimulus: function() {
+                const correctCount = jsPsych.data.get().filter({ correct: true }).count();  // Count correct responses
+                return `<p>Tak for din deltagelse!</p>
+                        <p>Du havde ${correctCount} korrekte svar ud af 20.</p>`;
+            },
+            choices: ['OK']
         };
-        timeline.push(endMessage);
 
-        // Start the experiment
-        jsPsych.run(timeline);
+        timeline.push(finalMessage);
+
+        // Function to upload data after the experiment ends
+        function uploadData() {
+            const url = "https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec"; // Update with your script ID
+            const data = jsPsych.data.get().csv(); // Collect data in CSV format
+
+            fetch(url, {
+                method: 'POST',
+                body: data,
+                headers: {
+                    "Content-Type": "text/csv",
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok ' + response.statusText);
+                }
+                return response.text();
+            })
+            .then(data => console.log("Data uploaded successfully: ", data))
+            .catch(error => {
+                console.error("Data upload failed:", error);
+                alert("Data upload failed. Please check the console for more details.");
+            });
+        }
+
+        // Initialize the experiment
+        jsPsych.run({
+            timeline: timeline,
+            show_progress_bar: true,
+            on_finish: uploadData // Call uploadData function when the experiment is finished
+        });
     </script>
 </body>
 
 </html>
-
