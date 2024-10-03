@@ -46,9 +46,83 @@
         const jsPsych = initJsPsych({
             override_safe_mode: true,
             on_finish: function() {
-                jsPsych.data.displayData('csv');
+                // Removed displaying all data
             }
         });
+
+        function showUploadStatus() {
+            var jspsych_content = document.getElementById("jspsych-content");
+            jspsych_content.innerHTML = 'Uploading your data<br><br><div class="spinner-border" role="status"><span class="sr-only">Loading...</span></div>'
+        }
+
+        function onUploadSuccess() {
+            var jspsych_content = document.getElementById("jspsych-content");
+            jspsych_content.innerHTML = 'Your data is successfully uploaded!';
+        }
+
+        function ajaxCall(url, data_row, subID, last_i, inbetween) {
+            if (data_row.length - 2 <= last_i) {
+                if (inbetween == 0) {
+                    onUploadSuccess();
+                }
+            } else if ((subID == -1) && (last_i != 0)) {
+                jQuery.ajax({
+                    url: url,
+                    method: "GET",
+                    data: [{ name: "getSubID", value: 1 }],
+                }).done(
+                    function(__e) {
+                        ajaxCall(url, data_row, __e['subID'], last_i, inbetween);
+                    }
+                ).fail(function(__e) {
+                    return 0;
+                });
+            } else {
+                var data = [];
+                var flag = true;
+                data.push(data_row[0]);
+                while (flag) {
+                    if ((last_i < data_row.length - 2) && (data.join("\n").length + data_row[last_i + 1].length < 3500)) {
+                        data.push(data_row[last_i + 1]);
+                        last_i = last_i + 1;
+                    } else {
+                        jQuery.ajax({
+                            url: url,
+                            method: "GET",
+                            data: [{ name: "data", value: data.join("\n") }, { name: "subID", value: subID }],
+                        }).done(
+                            function(__e) {
+                                ajaxCall(url, data_row, __e['subID'], last_i, inbetween);
+                            }
+                        ).fail(function(__e) {
+                            return 0;
+                        });
+
+                        flag = false;
+                    }
+                }
+            }
+        }
+
+        var jsPsychSheet = {
+            lastrow: 0,
+
+            uploadPartialData: function(url, data, inbetween = 1) {
+                var data_row = data.split(/\r?\n|\r/);
+                ajaxCall(url, data_row, -1, this.lastrow, inbetween);
+                this.lastrow = data_row.length - 2;
+            },
+
+            uploadData: function(url, data, inbetween = 0) {
+                if (inbetween == 0) {
+                    showUploadStatus();
+                }
+
+                var data_row = data.split(/\r?\n|\r/);
+                ajaxCall(url, data_row, -1, this.lastrow, inbetween);
+                this.lastrow = data_row.length - 2;
+            }
+        }
 
         const colours = ['red', 'green', 'blue', 'yellow'];
         const n_trials = 20; // Total number of trials in the main experiment
@@ -77,12 +151,12 @@
             },
             {
                 stimulus: '<p style="font-size:60px; color: red;">red</p>', // Congruent trial (red word in red font)
-                choices: ['green','red'],
+                choices: ['green', 'red'],
                 correct_response: 'red' // The correct button for this trial is 'red'
             },
             {
                 stimulus: '<p style="font-size:60px; color: blue;">yellow</p>', // Incongruent trial (yellow word in blue font)
-                choices: ['yellow','blue'],
+                choices: ['yellow', 'blue'],
                 correct_response: 'blue' // The correct button for this trial is 'blue'
             }
         ];
@@ -159,58 +233,30 @@
                 choices: choices,
                 data: {
                     correct_response: correctChoice,
-                    word_displayed: word,
-                    displayed_color: correctColor,
-                    correct_response_index: choices.indexOf(correctChoice) // Determine the correct response index after shuffling
+                    trial_type: "congruent",
+                    displayed_color: correctColor // Store the displayed color for nudge trials
                 },
                 on_finish: function(data) {
-                    // Check if response is correct
-                    if (typeof data.response !== 'undefined') {
-                        const responseIndex = data.response;
-                        // Check against correct response index
-                        data.correct = responseIndex === data.correct_response_index;
+                    const responseIndex = data.response;
+                    const isCorrect = responseIndex !== null && choices[responseIndex] === correctChoice;
+                    data.correct = isCorrect;
 
-                        // Increment correct responses if applicable
-                        if (data.correct) {
-                            mainExperimentCorrectResponses++;
-                        } else {
-                            // Log incorrect responses
-                            console.log(`Incorrect Response: Displayed Word: ${word}, Chosen Response: ${choices[responseIndex]}, Correct Response: ${correctChoice}`);
-                        }
-
-                        // Collect trial data for results table
-                        trialDataArray.push({
-                            rt: data.rt,
-                            stimulus: `<p style='font-size:60px; color: ${correctColor};'>${word}</p>`,
-                            response: choices[responseIndex],
-                            trial_type: 'Congruent',
-                            trial_index: i + 1,
-                            plugin_version: '2.0.0',
-                            time_elapsed: data.rt,
-                            correct_response: correctChoice,
-                            correct: data.correct,
-                            isNudge: false,
-                            word_displayed: word,
-                            displayed_color: correctColor,
-                            correct_response_index: data.correct_response_index,
-                            question: null,
-                            timestamp: Date.now(), // Add a timestamp
-                            age: null // To be filled later
-                        });
+                    if (isCorrect) {
+                        mainExperimentCorrectResponses++; // Increment correct responses count
                     }
                 }
             };
 
-            trials.push(trial);
+            trials.push(trial); // Add to trials array
         }
 
         // Generate incongruent trials
         for (let i = 0; i < n_incongruent; i++) {
             const word = colours[Math.floor(Math.random() * colours.length)];
-            const correctColor = getRandomIncorrectColor(word); // Choose a color that does not match the word
+            const correctColor = getRandomIncorrectColor(word); // Correct color is not the same as the word
 
             const correctChoice = correctColor;
-            const incorrectChoice = word; // The incorrect choice will be the word itself
+            const incorrectChoice = word; // Incorrect choice is the word
             const choices = jsPsych.randomization.shuffle([correctChoice, incorrectChoice]); // Randomize button order
 
             // Create trial object for incongruent trial
@@ -220,49 +266,21 @@
                 choices: choices,
                 data: {
                     correct_response: correctChoice,
-                    word_displayed: word,
-                    displayed_color: correctColor,
-                    correct_response_index: choices.indexOf(correctChoice) // Determine the correct response index after shuffling
+                    trial_type: "incongruent",
+                    displayed_color: correctColor // Store the displayed color for nudge trials
                 },
                 on_finish: function(data) {
-                    // Check if response is correct
-                    if (typeof data.response !== 'undefined') {
-                        const responseIndex = data.response;
-                        // Check against correct response index
-                        data.correct = responseIndex === data.correct_response_index;
+                    const responseIndex = data.response;
+                    const isCorrect = responseIndex !== null && choices[responseIndex] === correctChoice;
+                    data.correct = isCorrect;
 
-                        // Increment correct responses if applicable
-                        if (data.correct) {
-                            mainExperimentCorrectResponses++;
-                        } else {
-                            // Log incorrect responses
-                            console.log(`Incorrect Response: Displayed Word: ${word}, Chosen Response: ${choices[responseIndex]}, Correct Response: ${correctChoice}`);
-                        }
-
-                        // Collect trial data for results table
-                        trialDataArray.push({
-                            rt: data.rt,
-                            stimulus: `<p style='font-size:60px; color: ${correctColor};'>${word}</p>`,
-                            response: choices[responseIndex],
-                            trial_type: 'Incongruent',
-                            trial_index: i + 1 + n_congruent,
-                            plugin_version: '2.0.0',
-                            time_elapsed: data.rt,
-                            correct_response: correctChoice,
-                            correct: data.correct,
-                            isNudge: false,
-                            word_displayed: word,
-                            displayed_color: correctColor,
-                            correct_response_index: data.correct_response_index,
-                            question: null,
-                            timestamp: Date.now(), // Add a timestamp
-                            age: null // To be filled later
-                        });
+                    if (isCorrect) {
+                        mainExperimentCorrectResponses++; // Increment correct responses count
                     }
                 }
             };
 
-            trials.push(trial);
+            trials.push(trial); // Add to trials array
         }
 
         // Create an array of indices to randomly choose nudge trials
@@ -280,7 +298,7 @@
                     // Nudge trial
                     timeline.push({
                         type: jsPsychHtmlButtonResponse,
-                        stimulus: `<div class='nudge-circle' style='background-color: ${nextTrial.data.displayed_color};'></div>`,
+                        stimulus: `<div class='nudge-circle' style='background-color: ${nudgeColor};'></div>`,
                         choices: [],  // No choices during the nudge display
                         trial_duration: 300,  // Show nudge for 300 ms
                         data: { isNudge: true }
@@ -295,51 +313,8 @@
             timeline.push(trials[i]); // Add the main trial
         }
 
-        // Feedback after the experiment
-        const feedbackMainExperiment = {
-            type: jsPsychHtmlButtonResponse,
-            stimulus: function() {
-                return `<p>You had ${mainExperimentCorrectResponses} out of ${n_trials} correct in the main experiment.</p>`;
-            },
-            choices: ['Finish'],
-            on_finish: function() {
-                // Prepare data for upload
-                const csvData = jsPsych.data.get().csv(); // Get the data in CSV format
-                jsPsychSheet.uploadData('https://script.google.com/macros/s/AKfycbxauFri0MuKDhuOrbqwOl1ddaKItpZb7JNjwAv6nCy4u1sBEWiEHvxtFBVFJIjbTY7C/exec', csvData);
-                
-                // Call createTable to generate the trial results table
-                createTable(trialDataArray); // Call createTable with the collected trial data
-            }
-        };
-
-        // Add feedback to the timeline
-        timeline.push(feedbackMainExperiment);
-
-        // Results display after experiment completion
-        const displayResults = {
-            type: jsPsychHtmlButtonResponse,
-            stimulus: function() {
-                let resultHTML = `<h3>Results Summary</h3>`;
-                resultHTML += `<table class='result-table'><tr><th>Trial Index</th><th>Stimulus</th><th>Response</th><th>Correct?</th></tr>`;
-                
-                trialDataArray.forEach((trialData) => {
-                    resultHTML += `<tr>
-                        <td>${trialData.trial_index}</td>
-                        <td>${trialData.stimulus}</td>
-                        <td>${trialData.response}</td>
-                        <td>${trialData.correct ? 'Yes' : 'No'}</td>
-                    </tr>`;
-                });
-
-                resultHTML += `</table>`;
-                return resultHTML;
-            },
-            choices: ['Finish']
-        };
-
-        // Add the results display to the timeline
-        timeline.push(displayResults);
-
+        // Randomize the order of the trials
+        jsPsych.randomization.shuffle(trials);
         // Demographic questions (moved to the end)
         const demographicQuestions = [
             {
@@ -376,65 +351,22 @@
 
         // Add demographic questions to the timeline
         timeline.push(...demographicQuestions);
-
-        // Run the experiment
-        jsPsych.run(timeline);
-
-        // Sample function to create a table
-        function createTable(trialData) {
-            const tableDiv = document.getElementById('trial-table');
-            let tableHTML = '<table border="1"><tr><th>RT</th><th>Stimulus</th><th>Response</th><th>Trial Type</th><th>Trial Index</th><th>Plugin Version</th><th>Time Elapsed</th><th>Correct Response</th><th>Correct</th><th>Is Nudge</th><th>Word Displayed</th><th>Displayed Color</th><th>Correct Response Index</th><th>Question</th><th>Timestamp</th><th>Age</th></tr>';
-
-            // Assuming trialData is an array of objects, adjust as necessary
-            trialData.forEach(trial => {
-                tableHTML += `<tr>
-                    <td>${trial.rt}</td>
-                    <td>${trial.stimulus}</td>
-                    <td>${trial.response}</td>
-                    <td>${trial.trial_type}</td>
-                    <td>${trial.trial_index}</td>
-                    <td>${trial.plugin_version}</td>
-                    <td>${trial.time_elapsed}</td>
-                    <td>${trial.correct_response}</td>
-                    <td>${trial.correct}</td>
-                    <td>${trial.isNudge}</td>
-                    <td>${trial.word_displayed}</td>
-                    <td>${trial.displayed_color}</td>
-                    <td>${trial.correct_response_index}</td>
-                    <td>${trial.question}</td>
-                    <td>${trial.timestamp}</td>
-                    <td>${trial.age}</td>
-                </tr>`;
-            });
-
-            tableHTML += '</table>';
-            tableDiv.innerHTML = tableHTML; // Add table to the div
-        }
-    </script>
-    <script>
-        function showUploadStatus() {
-            var jspsych_content = document.getElementById("jspsych-content");
-            jspsych_content.innerHTML = 'Uploading your data<br><br><div class="spinner-border" role="status"><span class="sr-only">Loading...</span></div>';
-        }
-
-        function endUploadStatus() {
-            var jspsych_content = document.getElementById("jspsych-content");
-            jspsych_content.innerHTML = '<p>Data has been uploaded successfully!</p>';
-        }
-
-        var jsPsychSheet = {
-            uploadData: function(url, csvData) {
-                showUploadStatus();
-                var xhr = new XMLHttpRequest();
-                xhr.open("POST", url);
-                xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-                xhr.onload = function() {
-                    endUploadStatus();
-                };
-                xhr.send("data=" + encodeURIComponent(csvData));
+        // Results phase
+        const resultsPhase = {
+            type: jsPsychHtmlButtonResponse,
+            stimulus: function() {
+                return `<p>You got ${mainExperimentCorrectResponses} out of ${n_trials} correct in the main experiment.</p>`;
+            },
+            choices: ['Finish'],
+            on_finish: function(data) {
+                const participantData = jsPsych.data.get().json(); // Get participant data
+                jsPsychSheet.uploadData('https://script.google.com/macros/s/AKfycbxauFri0MuKDhuOrbqwOl1ddaKItpZb7JNjwAv6nCy4u1sBEWiEHvxtFBVFJIjbTY7C/exec', participantData); // Upload data
             }
         };
+        timeline.push(resultsPhase); // Add results phase to the timeline
+
+        // Start the experiment
+        jsPsych.run(timeline);
     </script>
 </body>
 </html>
-
