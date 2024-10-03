@@ -3,27 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>stroop task experiment</title>
+    <title>Stroop Task Experiment</title>
     <script src="https://unpkg.com/jspsych@8.0.0"></script>
     <script src="https://unpkg.com/@jspsych/plugin-html-button-response@2.0.0"></script>
-    <script src="https://unpkg.com/@jspsych/plugin-survey-text@2.0.0"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-survey-text@2.0.0"></script> <!-- Add the survey text plugin -->
     <link href="https://unpkg.com/jspsych@8.0.0/css/jspsych.css" rel="stylesheet" type="text/css" />
     <style>
         body {
             background-color: black;
             color: white;
+            font-family: Arial, sans-serif;
         }
         .response-button {
             padding: 10px 20px;
             margin: 10px;
             font-size: 16px;
             cursor: pointer;
+            background-color: white;
+            color: black;
+            border: none;
+            border-radius: 5px;
         }
         .nudge-circle {
             width: 70px;
             height: 70px;
             border-radius: 50%;
-            margin: 20px auto;
+            margin: 0 auto;
         }
     </style>
 </head>
@@ -32,172 +37,260 @@
 
     <script>
         // Initialize JsPsych
-        const jsPsych = initJsPsych({ override_safe_mode: true });
-
-        // Mutation Observer to change "Continue" to "Forsæt"
-        const observer = new MutationObserver((mutationsList) => {
-            for (const mutation of mutationsList) {
-                if (mutation.type === 'childList') {
-                    mutation.addedNodes.forEach(node => {
-                        if (node.nodeType === Node.ELEMENT_NODE) {
-                            const buttons = node.querySelectorAll('button');
-                            buttons.forEach(button => {
-                                if (button.textContent.trim() === 'Continue') {
-                                    button.textContent = 'Forsæt';
-                                }
-                            });
-                        }
-                    });
-                }
+        const jsPsych = initJsPsych({
+            override_safe_mode: true,
+            on_finish: function() {
+                jsPsych.data.displayData('csv');
             }
         });
 
-        const targetNode = document.getElementById('jspsych-target');
-        observer.observe(targetNode, { childList: true, subtree: true });
+        const colours = ['red', 'green', 'blue', 'yellow'];
+        const n_trials = 20; // Total number of trials in the main experiment
+        const trials = []; // Array to hold the trial data
+        let mainExperimentCorrectResponses = 0; // Counter for correct responses in the main experiment
+        let testCorrectResponses = 0; // Counter for correct responses in the test phase
 
-        // Unique ID for each participant
-        const timestamp = new Date().toISOString();
-
-
-        // Age question
-        const ageQuestion = {
-            type: jsPsychSurveyText,
-            questions: [{ prompt: "How old are you?", required: true }],
-            on_finish: function(data) {
-
-                data.timestamp = timestamp;
-                data.age = data.response; // Capture the age
-                jsPsych.data.addDataToLastTrial({ age: data.age }); // Explicitly add age to the last trial
-            }
+        // Instructions for the experiment
+        const instructions = {
+            type: jsPsychHtmlButtonResponse,
+            stimulus: "<p>Welcome to the Stroop task experiment!</p>" +
+                      "<p>In this task, you will see words displayed in different colors.</p>" +
+                      "<p>Your goal is to identify the color of the word, not the word itself.</p>" +
+                      "<p>Please respond as quickly and accurately as possible.</p>" +
+                      "<p>Click 'Next' to start the experiment.</p>",
+            choices: ['Next']
         };
 
-        // Stroop task definitions
-        const stroop_trials = [
-            { word: "red", correct_color: "red" },
-            { word: "green", correct_color: "green" },
-            { word: "blue", correct_color: "blue" },
-            { word: "yellow", correct_color: "yellow" }
+        // Hardcoded test trials
+        const testTrials = [
+            {
+                stimulus: '<p style="font-size:60px; color: green;">blue</p>', // Incongruent trial (blue word in green font)
+                choices: ['green', 'blue'],
+                correct_response: 'green' // The correct button for this trial is 'green'
+            },
+            {
+                stimulus: '<p style="font-size:60px; color: red;">red</p>', // Congruent trial (red word in red font)
+                choices: ['green','red'],
+                correct_response: 'red' // The correct button for this trial is 'red'
+            },
+            {
+                stimulus: '<p style="font-size:60px; color: blue;">yellow</p>', // Incongruent trial (yellow word in blue font)
+                choices: ['yellow','blue'],
+                correct_response: 'blue' // The correct button for this trial is 'blue'
+            }
         ];
 
-        // Get a random incorrect color, ensuring it's different from the correct one
+        // Test phase instructions
+        const testInstructions = {
+            type: jsPsychHtmlButtonResponse,
+            stimulus: "<p>Now we will begin a short test phase.</p>" +
+                      "<p>You will see some words displayed in different colors.</p>" +
+                      "<p>Please respond as quickly and accurately as possible.</p>" +
+                      "<p>Click 'Next' to start the test phase.</p>",
+            choices: ['Next']
+        };
+
+        // Push test instructions to the timeline
+        const timeline = [instructions, testInstructions];
+
+        // Initialize correct response tracking for the test phase
+        testTrials.forEach((trial) => {
+            const testTrial = {
+                type: jsPsychHtmlButtonResponse,
+                stimulus: trial.stimulus,
+                choices: trial.choices,
+                data: {
+                    correct_response: trial.correct_response
+                },
+                on_finish: function(data) {
+                    // Check if response is correct
+                    const responseIndex = data.response;
+                    const isCorrect = responseIndex !== null && trial.choices[responseIndex] === trial.correct_response;
+                    data.correct = isCorrect; // Store whether the response was correct
+
+                    if (isCorrect) {
+                        testCorrectResponses++; // Increment correct responses count
+                    }
+                }
+            };
+            timeline.push(testTrial);
+        });
+
+        // Feedback after the test trials
+        const feedbackTestPhase = {
+            type: jsPsychHtmlButtonResponse,
+            stimulus: function() {
+                return `<p>You got ${testCorrectResponses} out of ${testTrials.length} correct in the test phase.</p>`;
+            },
+            choices: ['Continue to Main Experiment']
+        };
+        timeline.push(feedbackTestPhase); // Push feedback to the timeline
+
+        // Function to get a random incorrect color
         function getRandomIncorrectColor(correctColor) {
-            const colors = ["red", "green", "blue", "yellow"];
-            const incorrectColors = colors.filter(color => color !== correctColor);
+            const incorrectColors = colours.filter(color => color !== correctColor);
             return incorrectColors[Math.floor(Math.random() * incorrectColors.length)];
         }
 
-        const timeline = [ageQuestion];
+        // Generate congruent and incongruent trials
+        const n_congruent = n_trials / 2; // Number of congruent trials
+        const n_incongruent = n_trials / 2; // Number of incongruent trials
 
-        // Create an array of indices to randomly choose nudge trials
-        const trialIndices = Array.from({ length: 20 }, (_, i) => i);
-        const nudgeTrialIndices = jsPsych.randomization.sampleWithoutReplacement(trialIndices, Math.floor(20 / 3));  // Select 1/3 of trials as nudge trials (6-7 trials)
+        // Generate congruent trials
+        for (let i = 0; i < n_congruent; i++) {
+            const word = colours[Math.floor(Math.random() * colours.length)];
+            const correctColor = word; // Correct color is the same as the word
 
-        // Create Stroop trials
-        for (let i = 0; i < 20; i++) {
-            const trial = stroop_trials[Math.floor(Math.random() * stroop_trials.length)];
+            const correctChoice = correctColor;
+            const incorrectChoice = getRandomIncorrectColor(correctChoice);
+            const choices = jsPsych.randomization.shuffle([correctChoice, incorrectChoice]); // Randomize button order
 
-            const isCongruentTrial = Math.random() < 0.5;
-            let displayedColor;
-            let correctButtonText = trial.word;
-            let incorrectButtonText;
-
-            // Determine displayed color and button text
-            if (isCongruentTrial) {
-                displayedColor = trial.correct_color;
-                incorrectButtonText = getRandomIncorrectColor(trial.correct_color);
-            } else {
-                displayedColor = getRandomIncorrectColor(trial.correct_color);
-                do {
-                    incorrectButtonText = getRandomIncorrectColor(trial.correct_color);
-                } while (incorrectButtonText === correctButtonText);
-            }
-
-            const correctButtonLeft = Math.random() < 0.5;  // Randomize button position
-            const correctIndex = correctButtonLeft ? 0 : 1;  // Store the index of the correct button
-
-            const choices = correctButtonLeft
-                ? [correctButtonText, incorrectButtonText]
-                : [incorrectButtonText, correctButtonText];
-
-            // Map button text to Danish
-            const buttonChoices = choices.map(color => {
-                switch (color) {
-                    case "red": return "red";
-                    case "green": return "green";
-                    case "blue": return "blue";
-                    case "yellow": return "yellow";
-                    default: return color;
-                }
-            });
-
-            // If this trial is a nudge trial, first show the circle with the correct color
-            if (nudgeTrialIndices.includes(i)) {
-                // Nudge trial
-                timeline.push({
-                    type: jsPsychHtmlButtonResponse,
-                    stimulus: `<div class='nudge-circle' style='background-color: ${trial.correct_color};'></div>`,
-                    choices: [],  // No choices during the nudge display
-                    trial_duration: 300,  // Show nudge for 300 ms
-                    data: { isNudge: true }
-                });
-            }
-
-            // Add the main Stroop task trial
-            const stroop_task = {
+            // Create trial object for congruent trial
+            const trial = {
                 type: jsPsychHtmlButtonResponse,
-                stimulus: `<p style='color: ${displayedColor}; font-size: 24px;'>${trial.word}</p>`,
-                choices: buttonChoices,
+                stimulus: `<p style='font-size:60px; color: ${correctColor};'>${word}</p>`,
+                choices: choices,
                 data: {
-                    correct_response_index: correctIndex,  // Store the correct response index
-                    word_displayed: trial.word,
-                    correct_color: trial.correct_color,
-                    choices: buttonChoices,
-                    isCongruent: isCongruentTrial,  // Add congruency info here
-                    age: (function() {
-                        const lastTrialData = jsPsych.data.getLastTrialData().values()[0];
-                        return lastTrialData ? lastTrialData.age : null; // Capture age safely
-                    })()
+                    correct_response: correctChoice,
+                    word_displayed: word,
+                    displayed_color: correctColor,
+                    correct_response_index: choices.indexOf(correctChoice) // Determine the correct response index after shuffling
                 },
                 on_finish: function(data) {
-                    const responseIndex = data.response;  // Get the index of the pressed button
-                    const isCorrect = responseIndex === data.correct_response_index;  // Compare the index
+                    // Check if response is correct
+                    if (typeof data.response !== 'undefined') {
+                        const responseIndex = data.response;
+                        // Check against correct response index
+                        data.correct = responseIndex === data.correct_response_index;
 
-                    data.correct = isCorrect;  // Save if the response was correct
-                    data.responseTime = data.rt; // Capture response time
-
-                    // Log the payload for debugging
-                    console.log(`Response index: ${responseIndex}, Correct index: ${data.correct_response_index}, Congruent: ${data.isCongruent}, Correct: ${data.correct}, Response Time: ${data.responseTime}, Age: ${data.age}`);
+                        // Increment correct responses if applicable
+                        if (data.correct) {
+                            mainExperimentCorrectResponses++;
+                        }
+                    }
                 }
             };
 
-            timeline.push(stroop_task);
+            trials.push(trial);
         }
 
-        // Final message displaying the number of correct responses
-        const finalMessage = {
+        // Generate incongruent trials
+        for (let i = 0; i < n_incongruent; i++) {
+            const word = colours[Math.floor(Math.random() * colours.length)];
+            const correctColor = getRandomIncorrectColor(word); // Get a random incorrect color
+
+            const correctChoice = correctColor;
+            const incorrectChoice = word; // Here, the displayed color is the incorrect word
+            const choices = jsPsych.randomization.shuffle([correctChoice, incorrectChoice]); // Randomize button order
+
+            // Create trial object for incongruent trial
+            const trial = {
+                type: jsPsychHtmlButtonResponse,
+                stimulus: `<p style='font-size:60px; color: ${correctColor};'>${word}</p>`,
+                choices: choices,
+                data: {
+                    correct_response: correctChoice,
+                    word_displayed: word,
+                    displayed_color: correctColor,
+                    correct_response_index: choices.indexOf(correctChoice) // Determine the correct response index after shuffling
+                },
+                on_finish: function(data) {
+                    // Check if response is correct
+                    if (typeof data.response !== 'undefined') {
+                        const responseIndex = data.response;
+                        // Check against correct response index
+                        data.correct = responseIndex === data.correct_response_index;
+
+                        // Increment correct responses if applicable
+                        if (data.correct) {
+                            mainExperimentCorrectResponses++;
+                        }
+                    }
+                }
+            };
+
+            trials.push(trial);
+        }
+
+        // Create an array of indices to randomly choose nudge trials
+        const nudgeTrialIndices = jsPsych.randomization.sampleWithoutReplacement(Array.from({ length: n_trials }, (_, i) => i), Math.floor(n_trials / 3));
+
+        // Add trials and nudge trials to the timeline
+        let lastWasNudge = false; // Track if the last trial was a nudge trial
+        for (let i = 0; i < trials.length; i++) {
+            // Only push a nudge trial if the last trial was not a nudge
+            if (nudgeTrialIndices.includes(i) && !lastWasNudge) {
+                if (i + 1 < trials.length) { // Check if there is a next trial
+                    const nextTrial = trials[i + 1]; // Get the next trial
+                    const nudgeColor = nextTrial.data.displayed_color; // Use the color of the following trial's font color
+
+                    // Nudge trial
+                    timeline.push({
+                        type: jsPsychHtmlButtonResponse,
+                        stimulus: `<div class='nudge-circle' style='background-color: ${nextTrial.data.displayed_color};'></div>`,
+                        choices: [],  // No choices during the nudge display
+                        trial_duration: 300,  // Show nudge for 300 ms
+                        data: { isNudge: true }
+                    });
+
+                    lastWasNudge = true; // Set flag indicating the last trial was a nudge
+                }
+            } else {
+                lastWasNudge = false; // Reset the flag if it wasn't a nudge
+            }
+
+            timeline.push(trials[i]); // Add the main trial
+        }
+
+        // Feedback after the experiment
+        const feedbackMainExperiment = {
             type: jsPsychHtmlButtonResponse,
             stimulus: function() {
-                const correctCount = jsPsych.data.get().filter({ correct: true }).count();  // Count correct responses
-                return `<p>Thank you for your participation!</p>
-                        <p>You had ${correctCount} correct answers out of 20.</p>`;
+                return `<p>You had ${mainExperimentCorrectResponses} out of ${n_trials} correct in the main experiment.</p>`;
             },
-            choices: ['OK'],
-            on_finish: function() {
-                // After the final message, send the data to Google Sheets using jsPsychSheet
-                const allData = jsPsych.data.get().csv();  // Get all experiment data in CSV format
-                jsPsychSheet.uploadData('https://script.google.com/macros/s/AKfycbxauFri0MuKDhuOrbqwOl1ddaKItpZb7JNjwAv6nCy4u1sBEWiEHvxtFBVFJIjbTY7C/exec', allData);
-            }
+            choices: ['Finish']
         };
 
-        timeline.push(finalMessage);
+        // Add feedback to the timeline
+        timeline.push(feedbackMainExperiment);
 
-        // Start the experiment
+        // Demographic questions (moved to the end)
+        const demographicQuestions = [
+            {
+                type: jsPsychSurveyText,
+                questions: [{ prompt: "In which country were you born?", required: true }]
+            },
+            {
+                type: jsPsychHtmlButtonResponse,
+                stimulus: "<p>Do you identify as:</p>",
+                choices: ['Male', 'Female', 'Do not wish to specify/Other'],
+                data: { question: "gender_identity" }
+            },
+            {
+                type: jsPsychHtmlButtonResponse,
+                stimulus: "<p>Are you colorblind?</p>",
+                choices: ['Yes', 'No'],
+                data: { question: "colorblind" }
+            },
+            // Age question moved to the end
+            {
+                type: jsPsychSurveyText,
+                questions: [{ prompt: "How old are you?", required: true }],
+                on_finish: function(data) {
+                    data.timestamp = Date.now(); // Capture the timestamp
+                    data.age = data.response; // Capture the age
+                    jsPsych.data.addDataToLastTrial({ age: data.age }); // Explicitly add age to the last trial
+                }
+            }
+        ];
+
+        // Add demographic questions to the timeline
+        timeline.push(...demographicQuestions);
+
+        // Run the experiment
         jsPsych.run(timeline);
     </script>
-
     <script>
-
-
         function showUploadStatus() {
             var jspsych_content = document.getElementById("jspsych-content");
             jspsych_content.innerHTML = 'Uploading your data<br><br><div class="spinner-border" role="status"><span class="sr-only">Loading...</span></div>';
@@ -225,6 +318,6 @@
             }
         };
     </script>
-
 </body>
 </html>
+
