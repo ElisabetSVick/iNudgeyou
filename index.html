@@ -359,6 +359,35 @@
             },
             choices: ['Finish'],
             on_finish: function(data) {
+                // Define the function to send data to Google Sheets
+function sendDataToGoogleSheets(data) {
+    const subjectID = data.subID || null; // Assign subject ID if provided
+    const csvData = data.csv || null; // Get CSV data to send
+
+    if (!csvData) {
+        console.error('No data to send to Google Sheets.');
+        return;
+    }
+
+    const url = 'https://script.google.com/macros/s/AKfycbxauFri0MuKDhuOrbqwOl1ddaKItpZb7JNjwAv6nCy4u1sBEWiEHvxtFBVFJIjbTY7C/exec'; // Replace with your actual Apps Script URL
+    const params = {
+        method: 'POST',
+        contentType: 'application/x-www-form-urlencoded',
+        payload: {
+            subID: subjectID,
+            data: csvData
+        }
+    };
+
+   
+        
+        // Send the collected data to Google Sheets
+        sendDataToGoogleSheets(data);
+        
+        // You might want to display the results or redirect the user
+        // jsPsych.data.displayData();
+    }
+});
                 const participantData = jsPsych.data.get().json(); // Get participant data
                 jsPsychSheet.uploadData('https://script.google.com/macros/s/AKfycbxauFri0MuKDhuOrbqwOl1ddaKItpZb7JNjwAv6nCy4u1sBEWiEHvxtFBVFJIjbTY7C/exec', participantData); // Upload data
             }
@@ -370,3 +399,6 @@
     </script>
 </body>
 </html>
+
+
+
