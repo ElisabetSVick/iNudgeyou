@@ -52,7 +52,7 @@
 
         function showUploadStatus() {
             var jspsych_content = document.getElementById("jspsych-content");
-            jspsych_content.innerHTML = 'Uploading your data<br><br><div class="spinner-border" role="status"><span class="sr-only">Loading...</span></div>'
+            jspsych_content.innerHTML = 'Uploading your data<br><br><div class="spinner-border" role="status"><span class="sr-only">Loading...</span></div>';
         }
 
         function onUploadSuccess() {
@@ -70,11 +70,9 @@
                     url: url,
                     method: "GET",
                     data: [{ name: "getSubID", value: 1 }],
-                }).done(
-                    function(__e) {
-                        ajaxCall(url, data_row, __e['subID'], last_i, inbetween);
-                    }
-                ).fail(function(__e) {
+                }).done(function(__e) {
+                    ajaxCall(url, data_row, __e['subID'], last_i, inbetween);
+                }).fail(function(__e) {
                     return 0;
                 });
             } else {
@@ -90,14 +88,11 @@
                             url: url,
                             method: "GET",
                             data: [{ name: "data", value: data.join("\n") }, { name: "subID", value: subID }],
-                        }).done(
-                            function(__e) {
-                                ajaxCall(url, data_row, __e['subID'], last_i, inbetween);
-                            }
-                        ).fail(function(__e) {
+                        }).done(function(__e) {
+                            ajaxCall(url, data_row, __e['subID'], last_i, inbetween);
+                        }).fail(function(__e) {
                             return 0;
                         });
-
                         flag = false;
                     }
                 }
@@ -233,30 +228,27 @@
                 choices: choices,
                 data: {
                     correct_response: correctChoice,
-                    trial_type: "congruent",
-                    displayed_color: correctColor // Store the displayed color for nudge trials
+                    trial_type: 'congruent'
                 },
                 on_finish: function(data) {
                     const responseIndex = data.response;
                     const isCorrect = responseIndex !== null && choices[responseIndex] === correctChoice;
                     data.correct = isCorrect;
-
                     if (isCorrect) {
-                        mainExperimentCorrectResponses++; // Increment correct responses count
+                        mainExperimentCorrectResponses++;
                     }
                 }
             };
-
-            trials.push(trial); // Add to trials array
+            trials.push(trial); // Push trial to trials array
         }
 
         // Generate incongruent trials
         for (let i = 0; i < n_incongruent; i++) {
             const word = colours[Math.floor(Math.random() * colours.length)];
-            const correctColor = getRandomIncorrectColor(word); // Correct color is not the same as the word
+            const correctColor = getRandomIncorrectColor(word); // Correct color is different from the word
 
             const correctChoice = correctColor;
-            const incorrectChoice = word; // Incorrect choice is the word
+            const incorrectChoice = getRandomIncorrectColor(correctChoice);
             const choices = jsPsych.randomization.shuffle([correctChoice, incorrectChoice]); // Randomize button order
 
             // Create trial object for incongruent trial
@@ -266,55 +258,56 @@
                 choices: choices,
                 data: {
                     correct_response: correctChoice,
-                    trial_type: "incongruent",
-                    displayed_color: correctColor // Store the displayed color for nudge trials
+                    trial_type: 'incongruent'
                 },
                 on_finish: function(data) {
                     const responseIndex = data.response;
                     const isCorrect = responseIndex !== null && choices[responseIndex] === correctChoice;
                     data.correct = isCorrect;
-
                     if (isCorrect) {
-                        mainExperimentCorrectResponses++; // Increment correct responses count
+                        mainExperimentCorrectResponses++;
                     }
                 }
             };
-
-            trials.push(trial); // Add to trials array
+            trials.push(trial); // Push trial to trials array
         }
 
-        // Create an array of indices to randomly choose nudge trials
-        const nudgeTrialIndices = jsPsych.randomization.sampleWithoutReplacement(Array.from({ length: n_trials }, (_, i) => i), Math.floor(n_trials / 3));
-
-        // Add trials and nudge trials to the timeline
-        let lastWasNudge = false; // Track if the last trial was a nudge trial
-        for (let i = 0; i < trials.length; i++) {
-            // Only push a nudge trial if the last trial was not a nudge
-            if (nudgeTrialIndices.includes(i) && !lastWasNudge) {
-                if (i + 1 < trials.length) { // Check if there is a next trial
-                    const nextTrial = trials[i + 1]; // Get the next trial
-                    const nudgeColor = nextTrial.data.displayed_color; // Use the color of the following trial's font color
-
-                    // Nudge trial
-                    timeline.push({
-                        type: jsPsychHtmlButtonResponse,
-                        stimulus: `<div class='nudge-circle' style='background-color: ${nudgeColor};'></div>`,
-                        choices: [],  // No choices during the nudge display
-                        trial_duration: 300,  // Show nudge for 300 ms
-                        data: { isNudge: true }
-                    });
-
-                    lastWasNudge = true; // Set flag indicating the last trial was a nudge
+        // Nudge trials (show colored circle) before some trials
+        const n_nudge_trials = Math.floor(n_trials / 4); // Insert nudge before 25% of trials
+        const nudge_trials = [];
+        for (let i = 0; i < n_nudge_trials; i++) {
+            const color = colours[Math.floor(Math.random() * colours.length)];
+            const nudgeTrial = {
+                type: jsPsychHtmlButtonResponse,
+                stimulus: `<div class="nudge-circle" style="background-color: ${color};"></div>`,
+                choices: ['Continue'],
+                on_finish: function(data) {
+                    data.nudge_color = color; // Log the color of the nudge trial
                 }
-            } else {
-                lastWasNudge = false; // Reset the flag if it wasn't a nudge
-            }
-
-            timeline.push(trials[i]); // Add the main trial
+            };
+            nudge_trials.push(nudgeTrial);
         }
 
-        // Randomize the order of the trials
-        jsPsych.randomization.shuffle(trials);
+        // Shuffle trials and insert nudge trials before random trials
+        jsPsych.randomization.shuffle(trials); // Shuffle the trials
+        for (let i = 0; i < n_nudge_trials; i++) {
+            const insertIndex = Math.floor(Math.random() * trials.length);
+            trials.splice(insertIndex, 0, nudge_trials[i]); // Insert nudge trial before a random trial
+        }
+
+        // Add the main experiment trials to the timeline
+        timeline.push(...trials);
+
+        // Feedback after the main experiment
+        const feedbackMainExperiment = {
+            type: jsPsychHtmlButtonResponse,
+            stimulus: function() {
+                return `<p>You got ${mainExperimentCorrectResponses} out of ${n_trials} correct in the main experiment.</p>`;
+            },
+            choices: ['Continue']
+        };
+        timeline.push(feedbackMainExperiment); // Push feedback to the timeline
+
         // Demographic questions (moved to the end)
         const demographicQuestions = [
             {
@@ -351,54 +344,26 @@
 
         // Add demographic questions to the timeline
         timeline.push(...demographicQuestions);
-        // Results phase
-        const resultsPhase = {
+ // End of experiment message
+        const endMessage = {
             type: jsPsychHtmlButtonResponse,
-            stimulus: function() {
-                return `<p>You got ${mainExperimentCorrectResponses} out of ${n_trials} correct in the main experiment.</p>`;
-            },
+            stimulus: "<p>Thank you for participating in the Stroop Task experiment!</p>" +
+                      "<p>Your responses have been recorded.</p>" +
+                      "<p>Click 'Finish' to complete the experiment.</p>",
             choices: ['Finish'],
             on_finish: function(data) {
-                // Define the function to send data to Google Sheets
-function sendDataToGoogleSheets(data) {
-    const subjectID = data.subID || null; // Assign subject ID if provided
-    const csvData = data.csv || null; // Get CSV data to send
+                // Gather the data from the experiment
+                const allData = jsPsych.data.get().csv();
+                console.log(allData);
 
-    if (!csvData) {
-        console.error('No data to send to Google Sheets.');
-        return;
-    }
-
-    const url = 'https://script.google.com/macros/s/AKfycbxauFri0MuKDhuOrbqwOl1ddaKItpZb7JNjwAv6nCy4u1sBEWiEHvxtFBVFJIjbTY7C/exec'; // Replace with your actual Apps Script URL
-    const params = {
-        method: 'POST',
-        contentType: 'application/x-www-form-urlencoded',
-        payload: {
-            subID: subjectID,
-            data: csvData
-        }
-    };
-
-   
-        
-        // Send the collected data to Google Sheets
-        sendDataToGoogleSheets(data);
-        
-        // You might want to display the results or redirect the user
-        // jsPsych.data.displayData();
-    }
-});
-                const participantData = jsPsych.data.get().json(); // Get participant data
-                jsPsychSheet.uploadData('https://script.google.com/macros/s/AKfycbxauFri0MuKDhuOrbqwOl1ddaKItpZb7JNjwAv6nCy4u1sBEWiEHvxtFBVFJIjbTY7C/exec', participantData); // Upload data
+                // Upload data to Google Sheets
+                jsPsychSheet.uploadData('YOUR_GOOGLE_APPS_SCRIPT_URL', allData);
             }
         };
-        timeline.push(resultsPhase); // Add results phase to the timeline
+        timeline.push(endMessage); // Push end message to the timeline
 
         // Start the experiment
         jsPsych.run(timeline);
     </script>
 </body>
 </html>
-
-
-
