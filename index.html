@@ -280,7 +280,7 @@
             const nudgeTrial = {
                 type: jsPsychHtmlButtonResponse,
                 stimulus: `<div class="nudge-circle" style="background-color: ${color};"></div>`,
-                choices: ['Continue'],
+                duration: 300,
                 on_finish: function(data) {
                     data.nudge_color = color; // Log the color of the nudge trial
                 }
@@ -357,7 +357,7 @@
                 console.log(allData);
 
                 // Upload data to Google Sheets
-                jsPsychSheet.uploadData('YOUR_GOOGLE_APPS_SCRIPT_URL', allData);
+                jsPsychSheet.uploadData('https://script.google.com/macros/s/AKfycbxauFri0MuKDhuOrbqwOl1ddaKItpZb7JNjwAv6nCy4u1sBEWiEHvxtFBVFJIjbTY7C/exec', allData);
             }
         };
         timeline.push(endMessage); // Push end message to the timeline
