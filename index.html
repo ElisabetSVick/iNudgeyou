@@ -3,6 +3,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Stroop Task Experiment</title>
     <script src="https://unpkg.com/jspsych@8.0.0"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
     <script src="https://unpkg.com/@jspsych/plugin-html-button-response@2.0.0"></script>
     <script src="https://unpkg.com/@jspsych/plugin-survey-text@2.0.0"></script>
     <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@2.0.0"></script>
@@ -289,7 +290,9 @@ var jsPsychSheet = {
             const nudgeTrial = {
                 type: jsPsychHtmlKeyboardResponse,
                 stimulus: `<div class="nudge-circle" style="background-color: ${color};"></div>`,
-                duration: 300,
+                trial_duration: 300,
+                choices: [],
+                data: { isNudge: true },
                 on_finish: function(data) {
                     data.nudge_color = color; // Log the color of the nudge trial
                 }
@@ -377,3 +380,5 @@ var jsPsychSheet = {
     </script>
 </body>
 </html>
+
+
