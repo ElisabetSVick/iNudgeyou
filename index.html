@@ -41,12 +41,15 @@
 <body>
     <div id="jspsych-target"></div>
     <script>
-        // Initialize JsPsych
-        const jsPsych = initJsPsych({
-            override_safe_mode: true,
-            on_finish: function() {
-            }
-        });
+const jsPsych = initJsPsych({
+    override_safe_mode: true,
+    on_finish: function() {
+        // Handle data upload or display results here
+    },
+    data: {
+        exclude: ['plugin'] // Exclude plugin version data from being logged
+    }
+});
 
 // jsPsychSheet v2 - A simple JavaScript library to use jsPsych and Google Sheet to run behavioral experiments online.
 // Created by Shashi Kant Gupta, June 06, 2021.
@@ -128,7 +131,10 @@ var jsPsychSheet = {
     this.lastrow = data_row.length-2;
   }
 }
-
+        let participantAge = null;
+        let participantGender = null;
+        let colorblindStatus = null;
+        let participantCountry = null;
         const colours = ['red', 'green', 'blue', 'yellow'];
         const n_trials = 20; // Total number of trials in the main experiment
         const trials = []; // Array to hold the trial data
@@ -222,8 +228,8 @@ var jsPsychSheet = {
         const n_congruent = n_trials / 2; // Number of congruent trials
         const n_incongruent = n_trials / 2; // Number of incongruent trials
 
-        // Generate congruent trials
-        for (let i = 0; i < n_congruent; i++) {
+ // Generate congruent trials
+ for (let i = 0; i < n_congruent; i++) {
             const word = colours[Math.floor(Math.random() * colours.length)];
             const correctColor = word; // Correct color is the same as the word
 
@@ -285,6 +291,7 @@ var jsPsychSheet = {
         // Nudge trials (show colored circle) before some trials
         const n_nudge_trials = Math.floor(n_trials / 3); // Insert nudge before 1/3 of trials
         const nudge_trials = [];
+
         for (let i = 0; i < n_nudge_trials; i++) {
             const color = colours[Math.floor(Math.random() * colours.length)];
             const nudgeTrial = {
@@ -302,11 +309,11 @@ var jsPsychSheet = {
 
         // Shuffle trials and insert nudge trials before random trials
         jsPsych.randomization.shuffle(trials); // Shuffle the trials
+
         for (let i = 0; i < n_nudge_trials; i++) {
             const insertIndex = Math.floor(Math.random() * trials.length);
             trials.splice(insertIndex, 0, nudge_trials[i]); // Insert nudge trial before a random trial
         }
-        
 
         // Add the main experiment trials to the timeline
         timeline.push(...trials);
@@ -319,45 +326,56 @@ var jsPsychSheet = {
             },
             choices: ['Continue']
         };
+
         timeline.push(feedbackMainExperiment); // Push feedback to the timeline
 
-        // Demographic questions (moved to the end)
         const demographicQuestions = [
             {
                 type: jsPsychSurveyText,
-                questions: [{ prompt: "In which country were you born?", required: true }]
+                questions: [{ prompt: "In which country were you born?", required: true }],
+                on_finish: function(data) {
+                    participantCountry = data.response;  // Store the response in a variable
+                }
             },
             {
                 type: jsPsychHtmlButtonResponse,
                 stimulus: "<p>Do you identify as:</p>",
                 choices: ['Male', 'Female', 'Do not wish to specify/Other'],
-                data: { question: "gender_identity" }
+                data: { question: "gender_identity" },
+                on_finish: function(data) {
+                    participantGender = data.response;
+                }
             },
             {
                 type: jsPsychHtmlButtonResponse,
                 stimulus: "<p>Are you colorblind?</p>",
                 choices: ['Yes', 'No'],
-                data: { question: "colorblind" }
+                data: { question: "colorblind" },
+                on_finish: function(data) {
+                    colorblindStatus = data.response;
+                }
             },
-            // Age question moved to the end
             {
                 type: jsPsychSurveyText,
                 questions: [{ prompt: "How old are you?", required: true }],
                 on_finish: function(data) {
-                    data.timestamp = Date.now(); // Capture the timestamp
-                    data.age = data.response; // Capture the age
-                    jsPsych.data.addDataToLastTrial({ age: data.age }); // Explicitly add age to the last trial
-                    // Update trial data array with age for each trial
-                    trialDataArray.forEach(trial => {
-                        trial.age = data.age; // Assign the age to each trial data
-                    });
+                    participantAge = data.response;
                 }
             }
         ];
 
         // Add demographic questions to the timeline
         timeline.push(...demographicQuestions);
- // End of experiment message
+
+        // **Add demographic data to all trials here:**
+        jsPsych.data.addProperties({
+            age: participantAge,
+            gender_identity: participantGender,
+            colorblind: colorblindStatus,
+            country_of_birth: participantCountry // Add country of birth
+        });
+
+        // End of experiment message
         const endMessage = {
             type: jsPsychHtmlButtonResponse,
             stimulus: "<p>Thank you for participating in the Stroop Task experiment!</p>" +
@@ -366,19 +384,21 @@ var jsPsychSheet = {
             choices: ['Finish'],
             on_finish: function(data) {
                 // Gather the data from the experiment
-                const allData = jsPsych.data.get().csv();
-                console.log(allData);
+                const allData = jsPsych.data.get().csv({ 
+                    columns: ['trial_index', 'response', 'correct', 'trial_type', 'rt', 'age', 'gender_identity', 'colorblind'] 
+                });
 
                 // Upload data to Google Sheets
-                jsPsychSheet.uploadData('https://script.google.com/macros/s/AKfycbxauFri0MuKDhuOrbqwOl1ddaKItpZb7JNjwAv6nCy4u1sBEWiEHvxtFBVFJIjbTY7C/exec', allData);
+                jsPsychSheet.uploadData('https://script.google.com/macros/s/AKfycbxauFri0MuKDhuOrbqwOl1ddaKItpZb7JNjwAv6nCy4u1sBEWiEHvxtFBVFJIjbTY7C/exec', 'trial_index,response,correct,trial_type,rt,age,gender_identity,colorblind\n' + allData);
             }
         };
+
         timeline.push(endMessage); // Push end message to the timeline
 
         // Start the experiment
         jsPsych.run(timeline);
+
     </script>
 </body>
 </html>
-
 
