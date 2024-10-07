@@ -47,7 +47,7 @@ const jsPsych = initJsPsych({
         // Handle data upload or display results here
     },
     data: {
-        exclude: ['plugin'] // Exclude plugin version data from being logged
+        exclude: ['plugin_version'] // Exclude plugin version data from being logged
     }
 });
 
@@ -329,51 +329,60 @@ var jsPsychSheet = {
 
         timeline.push(feedbackMainExperiment); // Push feedback to the timeline
 
-        const demographicQuestions = [
-            {
-                type: jsPsychSurveyText,
-                questions: [{ prompt: "In which country were you born?", required: true }],
-                on_finish: function(data) {
-                    participantCountry = data.response;  // Store the response in a variable
-                }
-            },
-            {
-                type: jsPsychHtmlButtonResponse,
-                stimulus: "<p>Do you identify as:</p>",
-                choices: ['Male', 'Female', 'Do not wish to specify/Other'],
-                data: { question: "gender_identity" },
-                on_finish: function(data) {
-                    participantGender = data.response;
-                }
-            },
-            {
-                type: jsPsychHtmlButtonResponse,
-                stimulus: "<p>Are you colorblind?</p>",
-                choices: ['Yes', 'No'],
-                data: { question: "colorblind" },
-                on_finish: function(data) {
-                    colorblindStatus = data.response;
-                }
-            },
-            {
-                type: jsPsychSurveyText,
-                questions: [{ prompt: "How old are you?", required: true }],
-                on_finish: function(data) {
-                    participantAge = data.response;
-                }
-            }
-        ];
+  const demographicQuestions = [
+    {
+        type: jsPsychSurveyText,
+        questions: [{ prompt: "In which country were you born?", required: true }],
+        on_finish: function(data) {
+            participantCountry = data.response['Q0']; // Store the response in a variable
+        }
+    },
+    {
+        type: jsPsychHtmlButtonResponse,
+        stimulus: "<p>Do you identify as:</p>",
+        choices: ['Male', 'Female', 'Do not wish to specify/Other'],
+        data: { question: "gender_identity" },
+        on_finish: function(data) {
+            participantGender = data.response; // Store the response as gender
+        }
+    },
+    {
+        type: jsPsychHtmlButtonResponse,
+        stimulus: "<p>Are you colorblind?</p>",
+        choices: ['Yes', 'No'],
+        data: { question: "colorblind" },
+        on_finish: function(data) {
+            colorblindStatus = data.response; // Store the response as colorblind status
+        }
+    },
+    {
+        type: jsPsychSurveyText,
+        questions: [{ prompt: "How old are you?", required: true }],
+        on_finish: function(data) {
+            participantAge = data.response['Q0']; // Store the response as age
+        }
+    }
+];
 
-        // Add demographic questions to the timeline
-        timeline.push(...demographicQuestions);
+// Add demographic questions to the timeline
+timeline.push(...demographicQuestions);
 
-        // **Add demographic data to all trials here:**
+// **Add demographic data to all trials AFTER demographic questions are answered:**
+timeline.push({
+    type: jsPsychHtmlButtonResponse,
+    stimulus: "<p>Thank you for providing your demographic information.</p>",
+    choices: ['Continue'],
+    on_finish: function() {
+        // Add demographic data to all subsequent trials
         jsPsych.data.addProperties({
             age: participantAge,
             gender_identity: participantGender,
             colorblind: colorblindStatus,
             country_of_birth: participantCountry // Add country of birth
         });
+    }
+});
+
 
         // End of experiment message
         const endMessage = {
