@@ -403,7 +403,7 @@ timeline.push({
                 });
 
                 // Upload data to Google Sheets
-                jsPsychSheet.uploadData('https://script.google.com/macros/s/AKfycbxauFri0MuKDhuOrbqwOl1ddaKItpZb7JNjwAv6nCy4u1sBEWiEHvxtFBVFJIjbTY7C/exec', 'trial_index,response,correct,trial_type,rt,age,gender_identity,colorblind\n', JSON.stringify(allData));
+                jsPsychSheet.uploadData('https://script.google.com/macros/s/AKfycbxauFri0MuKDhuOrbqwOl1ddaKItpZb7JNjwAv6nCy4u1sBEWiEHvxtFBVFJIjbTY7C/exec', `data=${encodeURIComponent(allData)}&subID=-1`);
             }
         };
 
