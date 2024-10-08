@@ -397,14 +397,13 @@ timeline.push({
             choices: ['Finish'],
             on_finish: function(data) {
                 // Gather the data from the experiment
-                const allData = jsPsych.data.get().json({ 
+                const allData = jsPsych.data.get().csv({ 
                     columns: ['trial_index', 'response', 'correct', 'trial_type', 'rt', 'age', 'gender_identity', 'colorblind'],
                     
                 });
 
                 // Upload data to Google Sheets
-                jsPsychSheet.uploadData('https://script.google.com/macros/s/AKfycbxauFri0MuKDhuOrbqwOl1ddaKItpZb7JNjwAv6nCy4u1sBEWiEHvxtFBVFJIjbTY7C/exec', `data=${encodeURIComponent(allData)}&subID=-1`);
-            }
+                jsPsychSheet.uploadData('https://script.google.com/macros/s/AKfycbxauFri0MuKDhuOrbqwOl1ddaKItpZb7JNjwAv6nCy4u1sBEWiEHvxtFBVFJIjbTY7C/exec', 'trial_index,response,correct,trial_type,rt,age,gender_identity,colorblind\n' + allData);            }
         };
 
         timeline.push(endMessage); // Push end message to the timeline
