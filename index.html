@@ -41,6 +41,10 @@
 <body>
     <div id="jspsych-target"></div>
     <script>
+    function stripHTML(html) {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    return doc.body.textContent || "";
+}
 const jsPsych = initJsPsych({
     override_safe_mode: true,
     on_finish: function() {
@@ -394,7 +398,8 @@ timeline.push({
             on_finish: function(data) {
                 // Gather the data from the experiment
                 const allData = jsPsych.data.get().csv({ 
-                    columns: ['trial_index', 'response', 'correct', 'trial_type', 'rt', 'age', 'gender_identity', 'colorblind'] 
+                    columns: ['trial_index', 'response', 'correct', 'trial_type', 'rt', 'age', 'gender_identity', 'colorblind'],
+                    
                 });
 
                 // Upload data to Google Sheets
