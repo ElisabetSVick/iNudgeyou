@@ -154,7 +154,10 @@ var jsPsychSheet = {
                       "<p>Your goal is to identify the color of the word, not the word itself.</p>" +
                       "<p>Please respond as quickly and accurately as possible.</p>" +
                       "<p>Click 'Next' to start the experiment.</p>",
-            choices: ['Next']
+            choices: ['Next'],
+            data: {
+                log: false
+            }
         };
 
         // Hardcoded test trials
@@ -183,7 +186,10 @@ var jsPsychSheet = {
                       "<p>You will see some words displayed in different colors.</p>" +
                       "<p>Please respond as quickly and accurately as possible.</p>" +
                       "<p>Click 'Next' to start the test phase.</p>",
-            choices: ['Next']
+            choices: ['Next'],
+            data: {
+                log: false
+            }
         };
 
         // Push test instructions to the timeline
@@ -218,7 +224,10 @@ var jsPsychSheet = {
             stimulus: function() {
                 return `<p>You got ${testCorrectResponses} out of ${testTrials.length} correct in the test phase.</p>`;
             },
-            choices: ['Continue to Main Experiment']
+            choices: ['Continue to Main Experiment'],
+            data: {
+                log: false
+            }
         };
         timeline.push(feedbackTestPhase); // Push feedback to the timeline
 
@@ -303,6 +312,9 @@ var jsPsychSheet = {
                 stimulus: `<div class="nudge-circle" style="background-color: ${color};"></div>`,
                 trial_duration: 300,
                 choices: [],
+                data: {
+                    log: false
+                },
                 data: { isNudge: true },
                 on_finish: function(data) {
                     data.nudge_color = color; // Log the color of the nudge trial
@@ -328,7 +340,10 @@ var jsPsychSheet = {
             stimulus: function() {
                 return `<p>You got ${mainExperimentCorrectResponses} out of ${n_trials} correct in the main experiment.</p>`;
             },
-            choices: ['Continue']
+            choices: ['Continue'],
+            data: {
+                log: false
+            }
         };
 
         timeline.push(feedbackMainExperiment); // Push feedback to the timeline
@@ -338,7 +353,7 @@ var jsPsychSheet = {
         type: jsPsychSurveyText,
         questions: [{ prompt: "In which country were you born?", required: true }],
         on_finish: function(data) {
-            participantCountry = data.response['Q0']; // Store the response in a variable
+            participantCountry = data.response; // Store the response in a variable
         }
     },
     {
@@ -363,7 +378,7 @@ var jsPsychSheet = {
         type: jsPsychSurveyText,
         questions: [{ prompt: "How old are you?", required: true }],
         on_finish: function(data) {
-            participantAge = data.response['Q0']; // Store the response as age
+            participantAge = data.response; // Store the response as age
         }
     }
 ];
@@ -376,6 +391,9 @@ timeline.push({
     type: jsPsychHtmlButtonResponse,
     stimulus: "<p>Thank you for providing your demographic information.</p>",
     choices: ['Continue'],
+    data: {
+        log: false
+    },
     on_finish: function() {
         // Add demographic data to all subsequent trials
         jsPsych.data.addProperties({
@@ -395,6 +413,9 @@ timeline.push({
                       "<p>Your responses have been recorded.</p>" +
                       "<p>Click 'Finish' to complete the experiment.</p>",
             choices: ['Finish'],
+            data: {
+                log: false
+            },
             on_finish: function(data) {
                 // Gather the data from the experiment
                 const allData = jsPsych.data.get().csv({ 
