@@ -312,9 +312,6 @@ var jsPsychSheet = {
                 stimulus: `<div class="nudge-circle" style="background-color: ${color};"></div>`,
                 trial_duration: 300,
                 choices: [],
-                data: {
-                    log: false
-                },
                 data: { isNudge: true },
                 on_finish: function(data) {
                     data.nudge_color = color; // Log the color of the nudge trial
